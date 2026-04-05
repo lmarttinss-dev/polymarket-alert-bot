@@ -276,7 +276,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2890,
+        3550,
         180
       ],
       "parameters": {
@@ -290,7 +290,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        3110,
+        3770,
         180
       ],
       "parameters": {
@@ -322,7 +322,7 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.1,
       "position": [
-        3330,
+        3990,
         80
       ],
       "parameters": {
@@ -347,10 +347,74 @@
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        3330,
+        3990,
         420
       ],
       "parameters": {}
+    },
+    {
+      "id": "n18",
+      "name": "Preparar Validação IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2890,
+        180
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const item = $input.first();\nconst d = item.json;\n\n// Se já é NO_TRADE ou sem mercados, pular validação\nif (d.signal === 'NO_TRADE' || !d.markets || d.markets.length === 0) {\n  return [{ json: { ...d, ai_validation_prompt: 'SKIP' } }];\n}\n\nconst market = d.markets[0];\nconst news = (d.news_text || '').substring(0, 250);\n\nconst prompt = `You are validating if a Polymarket prediction market is relevant to a breaking news tweet.\n\nTweet: \"${news}\"\nMarket question: \"${market.question}\"\n\nDoes this market DIRECTLY relate to the news in the tweet? Answer YES if the news could move the market probability. Answer NO if the connection is weak, indirect, or the market is about a different topic.\n\nAnswer with only YES or NO.`;\n\nreturn [{ json: { ...d, ai_validation_prompt: prompt } }];\n"
+      }
+    },
+    {
+      "id": "n19",
+      "name": "Validar Mercado IA",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        3110,
+        180
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.ai_validation_prompt }}"
+      }
+    },
+    {
+      "id": "n20",
+      "name": "Google Gemini Validação",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        3110,
+        300
+      ],
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {
+          "maxOutputTokens": 10
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "1",
+          "name": "Google Gemini API"
+        }
+      }
+    },
+    {
+      "id": "n21",
+      "name": "Extrair Validação",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3330,
+        180
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const llmOutput = $input.first().json;\nconst originalData = $('Filtrar Mercados').first().json;\n\n// Passou como SKIP (era NO_TRADE) — propagar direto\nif (originalData.signal === 'NO_TRADE' || !originalData.markets) {\n  return [{ json: originalData }];\n}\n\nconst answer = (llmOutput.response && llmOutput.response.text\n  ? llmOutput.response.text\n  : llmOutput.text || llmOutput.output || ''\n).trim().toUpperCase();\n\nif (!answer.startsWith('YES')) {\n  return [{ json: {\n    signal: 'NO_TRADE',\n    reason: 'Validação LLM: mercado não relevante para esta notícia',\n    news_text: originalData.news_text,\n    tweet_id: originalData.tweet_id,\n    tweet_url: originalData.tweet_url,\n    author: originalData.author,\n    author_followers: originalData.author_followers,\n    ai_query: originalData.ai_query\n  } }];\n}\n\nreturn [{ json: originalData }];\n"
+      }
     }
   ],
   "connections": {
@@ -505,7 +569,7 @@
       "main": [
         [
           {
-            "node": "Gerar Sinal",
+            "node": "Preparar Validação IA",
             "type": "main",
             "index": 0
           }
@@ -557,6 +621,50 @@
         [
           {
             "node": "Processar um por um",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Validação IA": {
+      "main": [
+        [
+          {
+            "node": "Validar Mercado IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Validação": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Validar Mercado IA",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Mercado IA": {
+      "main": [
+        [
+          {
+            "node": "Extrair Validação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair Validação": {
+      "main": [
+        [
+          {
+            "node": "Gerar Sinal",
             "type": "main",
             "index": 0
           }

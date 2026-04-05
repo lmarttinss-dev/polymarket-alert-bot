@@ -346,3 +346,57 @@ Após envio, retorna ao `Processar um por um` para o próximo tweet.
 | typeVersion | 1 |
 
 Encerra silenciosamente branches `NO_TRADE` e retorna ao loop para processar o próximo tweet. Recebe de três origens: `É Recente?` (false), `É Relevante?` (false) e `Verificar Oportunidade` (false).
+
+---
+
+## n18 — Preparar Validação IA
+
+| Propriedade | Valor |
+|---|---|
+| Tipo | `n8n-nodes-base.code` |
+| typeVersion | 2 |
+| Mode | `runOnceForAllItems` |
+
+Prepara o prompt de validação para o LLM. Se o input já for `NO_TRADE` (sem mercados encontrados), define `ai_validation_prompt: 'SKIP'` para pular a chamada sem custo extra.
+
+**Prompt gerado:**
+> "Does this market DIRECTLY relate to the news in the tweet? Answer YES if the news could move the market probability. Answer NO if the connection is weak, indirect, or about a different topic."
+
+---
+
+## n19 — Validar Mercado IA
+
+| Propriedade | Valor |
+|---|---|
+| Tipo | `@n8n/n8n-nodes-langchain.chainLlm` |
+| typeVersion | 1.4 |
+
+Basic LLM Chain que chama o Gemini com o prompt de validação. Sub-nó: `Google Gemini Validação` (n20).
+
+---
+
+## n20 — Google Gemini Validação
+
+| Propriedade | Valor |
+|---|---|
+| Tipo | `@n8n/n8n-nodes-langchain.lmChatGoogleGemini` |
+| Modelo | `models/gemini-2.5-flash` |
+| maxOutputTokens | 10 |
+
+Sub-nó do `Validar Mercado IA`. maxOutputTokens reduzido a 10 pois a resposta esperada é apenas `YES` ou `NO`.
+
+---
+
+## n21 — Extrair Validação
+
+| Propriedade | Valor |
+|---|---|
+| Tipo | `n8n-nodes-base.code` |
+| typeVersion | 2 |
+| Mode | `runOnceForAllItems` |
+
+Parseia a resposta do LLM de validação:
+- Se `YES` → passa os dados originais dos mercados para `Gerar Sinal`
+- Se `NO` (ou qualquer outra resposta) → retorna `{ signal: "NO_TRADE", reason: "Validação LLM: mercado não relevante para esta notícia" }`
+
+Usa backreference `$('Filtrar Mercados').first().json` para recuperar os dados originais dos mercados, pois o chainLlm não propaga o contexto anterior.
