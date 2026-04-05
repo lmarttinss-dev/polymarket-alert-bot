@@ -121,14 +121,34 @@ X-API-Key: <TWITTERAPI_IO_KEY>
 
 ---
 
-## Custo estimado
+## Custo e duração dos créditos
 
-| Cenário | Cálculo | Custo/mês |
-|---|---|---|
-| Schedule 30 min / 10 tweets | 48 × 10 × 30 = 14.400 tweets | **~$2,16** |
-| Schedule 15 min / 10 tweets | 96 × 10 × 30 = 28.800 tweets | **~$4,32** |
+### Precificação do twitterapi.io
 
-Preço: $0,15 por 1.000 tweets.
+| Item | Custo |
+|---|---|
+| Por tweet retornado | **15 créditos** |
+| Mínimo por chamada (sem resultados) | **15 créditos** |
+
+### Consumo do bot
+
+O schedule a cada 30 minutos gera **48 chamadas/dia**.
+
+| Cenário | Tweets/chamada | Créditos/chamada | Créditos/dia | Créditos/mês |
+|---|---|---|---|---|
+| Baixo | 5 | 75 | 3.600 | 108.000 |
+| Médio | 10 | 150 | 7.200 | 216.000 |
+| Alto | 20 | 300 | 14.400 | 432.000 |
+
+### Duração de 999.800 Recharge Credits
+
+| Cenário | Duração estimada |
+|---|---|
+| Baixo (5 tweets/chamada) | ~278 dias (**9,3 meses**) |
+| Médio (10 tweets/chamada) | ~139 dias (**4,6 meses**) |
+| Alto (20 tweets/chamada) | ~69 dias (**2,3 meses**) |
+
+> O cenário mais realista é o **médio (~4,6 meses)**, dado que a query é específica (breaking news + temas Polymarket) e tende a retornar 5–15 tweets por execução dependendo do horário e volume de notícias.
 
 ---
 
