@@ -357,9 +357,13 @@ Encerra silenciosamente branches `NO_TRADE` e retorna ao loop para processar o p
 | typeVersion | 2 |
 | Mode | `runOnceForAllItems` |
 
-Prepara o prompt de validação para o LLM. Se o input já for `NO_TRADE` (sem mercados encontrados), define `ai_validation_prompt: 'SKIP'` para pular a chamada sem custo extra.
+Prepara o prompt de validação para o LLM.
 
-**Prompt gerado:**
+**Sanitização do tweet:** aplica o mesmo `sanitize()` do n13 (remove URLs, asteriscos e emojis) antes de montar o prompt, evitando bloqueios do safety filter do LLM que causavam `text: ""`.
+
+**Skip sem custo:** se o input já for `NO_TRADE` ou sem mercados, seta `skip_validation: true` e `ai_validation_prompt: 'YES'` — o chainLlm n19 ainda executa, mas o n21 detecta o flag e ignora a resposta, sem desperdiçar tokens em uma chamada desnecessária.
+
+**Prompt gerado (quando há mercado):**
 > "Does this market DIRECTLY relate to the news in the tweet? Answer YES if the news could move the market probability. Answer NO if the connection is weak, indirect, or about a different topic."
 
 ---
@@ -395,8 +399,9 @@ Sub-nó do `Validar Mercado IA`. maxOutputTokens reduzido a 10 pois a resposta e
 | typeVersion | 2 |
 | Mode | `runOnceForAllItems` |
 
-Parseia a resposta do LLM de validação:
-- Se `YES` → passa os dados originais dos mercados para `Gerar Sinal`
-- Se `NO` (ou qualquer outra resposta) → retorna `{ signal: "NO_TRADE", reason: "Validação LLM: mercado não relevante para esta notícia" }`
+Parseia a resposta do LLM de validação via backreference `$('Filtrar Mercados').first().json` (o chainLlm não propaga o contexto anterior).
 
-Usa backreference `$('Filtrar Mercados').first().json` para recuperar os dados originais dos mercados, pois o chainLlm não propaga o contexto anterior.
+**Lógica de decisão:**
+1. Se `originalData.signal === 'NO_TRADE'` ou `skip_validation === true` → propaga `originalData` direto, ignorando a resposta do LLM
+2. Se resposta começa com `YES` → passa `originalData` (com `markets[]`) para `Gerar Sinal`
+3. Qualquer outra resposta (incluindo `NO`, vazio ou resposta inesperada) → retorna `{ signal: "NO_TRADE", reason: "Validação LLM: mercado não relevante para esta notícia" }`

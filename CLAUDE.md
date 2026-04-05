@@ -59,6 +59,10 @@ Schedule (30min) → Buscar Tweets (twitterapi.io) → Extrair Tweets
 | n15 | Extrair Query IA | Parseia resposta do LLM |
 | n16 | LLM Chat Model | Sub-nó do n14 via ai_languageModel |
 | n17 | É Relevante? | IF signal ≠ NO_TRADE |
+| n18 | Preparar Validação IA | Sanitiza tweet e monta prompt YES/NO; skip se NO_TRADE |
+| n19 | Validar Mercado IA | Basic LLM Chain — confirma se mercado bate com notícia |
+| n20 | LLM Chat Model - Validação | Sub-nó do n19 via ai_languageModel |
+| n21 | Extrair Validação | Parseia YES/NO; propaga NO_TRADE se rejeitado ou skip_validation |
 
 ---
 

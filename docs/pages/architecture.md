@@ -69,6 +69,22 @@
 └──────┬───────────┘  Match ≥ 2 palavras da query no título/descrição  │ │
        │              Retorna top 5 por volume                          │ │
        ▼                                                                │ │
+┌──────────────────────┐                                                │ │
+│ Preparar Validação IA│  n18 — Sanitiza tweet e monta prompt YES/NO   │ │
+└──────┬───────────────┘  skip_validation=true se já for NO_TRADE      │ │
+       │                                                                │ │
+       ▼                                                                │ │
+┌──────────────────┐                                                    │ │
+│ Validar Mercado  │  n19 — LLM confirma se mercado bate com notícia  │ │
+│      IA          │  Sub-nó: LLM Chat Model - Validação (n20)        │ │
+└──────┬───────────┘                                                    │ │
+       │                                                                │ │
+       ▼                                                                │ │
+┌──────────────────────┐                                                │ │
+│  Extrair Validação   │  n21 — YES → segue | NO/vazio → NO_TRADE     │ │
+└──────┬───────────────┘  skip_validation → propaga sem ler resposta   │ │
+       │                                                                │ │
+       ▼                                                                │ │
 ┌──────────────────┐                                                    │ │
 │  Gerar Sinal     │  n9 — Calcula direção, confiança, mensagem HTML   │ │
 └──────┬───────────┘                                                    │ │
@@ -129,7 +145,7 @@ Ciclo 10: SplitInBatches → T10 → pipeline → resultado → SplitInBatches
 
 ## Propagação de NO_TRADE
 
-O sinal `NO_TRADE` pode ser emitido em quatro pontos diferentes:
+O sinal `NO_TRADE` pode ser emitido em cinco pontos diferentes:
 
 ```
 n5 Analisar Noticia ──► NO_TRADE (tweet > 35 min)
@@ -146,6 +162,9 @@ n15 Extrair Query IA ──► { signal: "NO_TRADE" }
 n17 É Relevante? ──────► branch false → Sem Oportunidade → próximo tweet
 
 n8 Filtrar Mercados ───► NO_TRADE (nenhum mercado com ≥ 2 palavras match)
+                              │
+                              ▼
+n21 Extrair Validação ─► NO_TRADE (LLM rejeitou: mercado não bate com notícia)
                               │
                               ▼
 n9 Gerar Sinal ────────► detecta NO_TRADE, propaga sem alterar
@@ -172,6 +191,9 @@ n10 Verificar Oportunidade → branch NÃO → Sem Oportunidade → próximo twe
 | Roteamento | É Relevante? | Bifurcar tweets relevantes dos descartados pelo LLM |
 | Dados externos | Buscar Mercados | Única integração com Polymarket |
 | Filtragem | Filtrar Mercados | Garantir relevância (threshold dinâmico) e qualidade dos mercados |
+| Preparação | Preparar Validação IA | Sanitizar tweet e montar prompt de validação YES/NO |
+| Validação | Validar Mercado IA + LLM | Confirmar se mercado encontrado bate com a notícia |
+| Extração | Extrair Validação | Parsear YES/NO, emitir NO_TRADE se mercado rejeitado |
 | Decisão | Gerar Sinal | Calcular direção, confiança e montar mensagem |
 | Roteamento | Verificar Oportunidade | Bifurcar entre alerta e descarte |
 | Saída | Telegram Alert | Notificar oportunidade em HTML |
