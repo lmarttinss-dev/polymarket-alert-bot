@@ -50,6 +50,7 @@ Will the Fed cut interest rates in September 2026?
 💰 Volume: $125,000
 🤖 Query IA: fed rate cut
 
+🐦 https://x.com/Reuters/status/1234567890
 🔗 https://polymarket.com/event/fed-cut-rates-september-2026
 ```
 
@@ -125,6 +126,7 @@ const msg = "🚨 <b>ALERTA DE TRADE - POLYMARKET</b>\n\n"
   + "💪 <b>Confianca:</b> " + confidence + "%\n"
   + "📈 <b>Movimento:</b> " + yesPct + "% → " + expectedTo + "%\n"
   + "💰 <b>Volume:</b> $" + Math.round(volume).toLocaleString("en-US") + aiQueryInfo + "\n\n"
+  + "🐦 " + (data.tweet_url || "") + "\n"
   + "🔗 " + marketUrl;
 ```
 
