@@ -8,6 +8,14 @@ O projeto consiste em **um único arquivo**: `polymarket_trade_alert.json` — o
 
 ---
 
+## Regras de desenvolvimento
+
+- **Toda modificação no workflow, bug fix ou nova feature deve ser feita em uma branch dedicada** (`feat/`, `fix/`, `refactor/`, `docs/`) e mergeada em `main` ao final.
+- **Toda alteração que mude comportamento, adicione nodes ou corrija bugs deve ser acompanhada de atualização da documentação** em `docs/pages/` e neste `CLAUDE.md` (tabela de nodes, fluxo, propagação de NO_TRADE, etc.).
+- Commits em inglês seguindo Conventional Commits — veja a seção [Git workflow](#git-workflow).
+
+---
+
 ## Arquivo principal
 
 **`polymarket_trade_alert.json`** — workflow n8n com todos os nodes, conexões e parâmetros inline (credenciais hardcoded).
