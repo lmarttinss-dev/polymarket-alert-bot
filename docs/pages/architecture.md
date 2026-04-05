@@ -60,8 +60,8 @@
        │ true                    false ──────────────────────────────► │ │
        ▼                                                                │ │
 ┌──────────────────┐                                                    │ │
-│ Buscar Mercados  │  n7 — GET gamma-api.polymarket.com/markets        │ │
-└──────┬───────────┘  active=true, closed=false, limit=20              │ │
+│ Buscar Mercados  │  n7 — GET gamma-api.polymarket.com/public-search   │ │
+└──────┬───────────┘  q={{ search_query }} — busca por texto real      │ │
        │                                                                │ │
        ▼                                                                │ │
 ┌──────────────────┐                                                    │ │
@@ -171,7 +171,7 @@ n10 Verificar Oportunidade → branch NÃO → Sem Oportunidade → próximo twe
 | Extração | Extrair Query IA | Parsear saída do LLM, detectar NO_TRADE |
 | Roteamento | É Relevante? | Bifurcar tweets relevantes dos descartados pelo LLM |
 | Dados externos | Buscar Mercados | Única integração com Polymarket |
-| Filtragem | Filtrar Mercados | Garantir relevância e qualidade dos mercados |
+| Filtragem | Filtrar Mercados | Garantir relevância (threshold dinâmico) e qualidade dos mercados |
 | Decisão | Gerar Sinal | Calcular direção, confiança e montar mensagem |
 | Roteamento | Verificar Oportunidade | Bifurcar entre alerta e descarte |
 | Saída | Telegram Alert | Notificar oportunidade em HTML |
@@ -202,7 +202,7 @@ Extrair Query IA ───────────► { news_text, tweet_id, twe
                                  author, author_followers,
                                  search_query, ai_query, timestamp }
                                     │
-Buscar Mercados ────────────► [ ...array de mercados da Gamma API... ]
+Buscar Mercados ────────────► { events: [ { title, markets: [...] } ], pagination }
                                     │
                  backreference ◄────┘
                  $('Extrair Query IA').first().json

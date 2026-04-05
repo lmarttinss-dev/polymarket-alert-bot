@@ -240,10 +240,14 @@ Parseia a saída do LLM. Tenta os campos `text`, `response` e `output` em sequê
 |---|---|
 | Tipo | `n8n-nodes-base.httpRequest` |
 | typeVersion | 4.1 |
-| URL | `https://gamma-api.polymarket.com/markets` |
+| URL | `https://gamma-api.polymarket.com/public-search` |
 | Timeout | 10.000ms |
 
-Parâmetros: `search={{ $json.search_query }}`, `active=true`, `closed=false`, `limit=20`
+Parâmetros: `q={{ $json.search_query }}`
+
+> **Por que `/public-search` e não `/markets`?** O endpoint `/markets?search=` ignora completamente o parâmetro de busca e retorna sempre os mesmos mercados populares por ordem de criação. O `/public-search?q=` é o endpoint de busca por texto real usado pelo site da Polymarket — retorna eventos relevantes com seus mercados aninhados.
+
+**Saída:** `{ events: [...], pagination: { hasMore, totalResults } }`
 
 ---
 
@@ -255,14 +259,18 @@ Parâmetros: `search={{ $json.search_query }}`, `active=true`, `closed=false`, `
 | typeVersion | 2 |
 | Mode | `runOnceForAllItems` |
 
-**Filtros aplicados (em ordem):**
-1. `active !== false`, `closed !== true`, `archived !== true`
-2. `volume > $500`
-3. **Match de relevância:** pelo menos 2 palavras da `ai_query` devem aparecer no título ou nos primeiros 300 chars da descrição do mercado (1 palavra se a query tiver apenas 1 palavra)
-4. Ordena por volume descrescente
-5. Retorna top 5
+**Processamento da resposta do `/public-search`:**
+- A resposta tem estrutura `{ events: [...] }` onde cada evento contém `markets: [...]`
+- Extrai todos os mercados de todos os eventos, adicionando `eventSlug` e `eventTitle` a cada mercado
 
-O critério de 2 palavras evita que mercados populares não-relacionados (ex: "What will happen before GTA VI?") passem pelo filtro por conter apenas 1 palavra em comum com a notícia.
+**Filtros aplicados (em ordem):**
+1. Exclui mercados com `active === false`, `closed === true` ou `archived === true`
+2. `volume > $500`
+3. **Match de relevância:** palavras da `ai_query` devem aparecer em pelo menos um dos campos: título da pergunta, primeiros 300 chars da descrição, `eventTitle` ou `groupItemTitle`
+   - Query com 1–2 palavras → **1 match** basta
+   - Query com 3+ palavras → **2 matches** obrigatórios
+4. Ordena por volume decrescente
+5. Retorna top 5
 
 Usa backreference `$('Extrair Query IA').first().json` para recuperar dados do tweet.
 

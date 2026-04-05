@@ -6,7 +6,10 @@
       "name": "Schedule Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
-      "position": [250, 300],
+      "position": [
+        250,
+        300
+      ],
       "parameters": {
         "rule": {
           "interval": [
@@ -23,7 +26,10 @@
       "name": "Buscar Tweets",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [470, 300],
+      "position": [
+        470,
+        300
+      ],
       "parameters": {
         "method": "GET",
         "url": "https://api.twitterapi.io/twitter/tweet/advanced_search",
@@ -59,7 +65,10 @@
       "name": "Extrair Tweets",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [690, 300],
+      "position": [
+        690,
+        300
+      ],
       "parameters": {
         "mode": "runOnceForAllItems",
         "jsCode": "const item = $input.first();\nconst data = item.json;\n\nconst tweets = data.tweets || [];\n\nif (tweets.length === 0) {\n  return [{ json: { signal: \"NO_TRADE\", reason: \"Nenhum tweet retornado pela API\" } }];\n}\n\nreturn tweets.map(function(tweet) {\n  return {\n    json: {\n      id: tweet.id || \"\",\n      text: tweet.text || \"\",\n      author: (tweet.author && tweet.author.userName) || \"\",\n      author_followers: (tweet.author && tweet.author.followers) || 0,\n      createdAt: tweet.createdAt || \"\",\n      retweetCount: tweet.retweetCount || 0,\n      likeCount: tweet.likeCount || 0,\n      viewCount: tweet.viewCount || 0,\n      url: tweet.url || \"\",\n      isReply: tweet.isReply || false\n    }\n  };\n});"
@@ -70,7 +79,10 @@
       "name": "Processar um por um",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 1,
-      "position": [910, 300],
+      "position": [
+        910,
+        300
+      ],
       "parameters": {
         "batchSize": 1,
         "options": {}
@@ -81,7 +93,10 @@
       "name": "Analisar Noticia",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1130, 300],
+      "position": [
+        1130,
+        300
+      ],
       "parameters": {
         "mode": "runOnceForAllItems",
         "jsCode": "const item = $input.first();\nconst tweet = item.json;\n\nif (tweet.signal === \"NO_TRADE\") { return [item]; }\n\nconst createdAt = tweet.createdAt || \"\";\nif (createdAt) {\n  const tweetDate = new Date(createdAt);\n  const minutesAgo = (Date.now() - tweetDate.getTime()) / 60000;\n  if (minutesAgo > 35) {\n    return [{ json: { signal: \"NO_TRADE\", reason: \"Tweet mais antigo que 35 minutos (\" + Math.round(minutesAgo) + \"min)\" } }];\n  }\n}\n\nreturn [{\n  json: {\n    news_text: tweet.text || \"\",\n    tweet_id: tweet.id || \"\",\n    tweet_url: tweet.url || \"\",\n    author: tweet.author || \"\",\n    author_followers: tweet.author_followers || 0,\n    timestamp: new Date().toISOString()\n  }\n}];"
@@ -92,7 +107,10 @@
       "name": "É Recente?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1350, 300],
+      "position": [
+        1350,
+        300
+      ],
       "parameters": {
         "conditions": {
           "options": {
@@ -121,10 +139,13 @@
       "name": "Preparar Prompt IA",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1570, 180],
+      "position": [
+        1570,
+        180
+      ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const item = $input.first();\nconst data = item.json;\n\nfunction sanitize(text) {\n  return (text || \"\")\n    .replace(/https?:\\/\\/\\S+/g, \"\")\n    .replace(/\\*/g, \"\")\n    .replace(/[\\uD800-\\uDFFF]/g, \"\")\n    .replace(/\\s+/g, \" \")\n    .trim();\n}\n\nconst tweetText = sanitize(data.news_text);\nconst author = data.author || \"\";\nconst followers = data.author_followers || 0;\n\nconst prompt = `You are a Polymarket prediction market expert. Analyze this tweet and determine if it contains breaking news that would affect prediction markets.\n\nTweet: \"${tweetText}\"\nAuthor: @${author} (${followers} followers)\n\nTASK: If this tweet reports a real-world event relevant to prediction markets (elections, policy decisions, geopolitical events, economic announcements, regulatory changes, conflicts, etc.), respond with the best 2-5 word Polymarket search query that will find the most relevant active markets.\n\nIf the tweet is a reply, personal opinion, joke, insult, spam, or does NOT relate to any verifiable event that prediction markets would track, respond with exactly: NO_TRADE\n\nExamples of good search queries: fed rate cut, bitcoin price 100k, trump election 2024, ukraine ceasefire deal, israel iran war, china taiwan invasion\n\nRespond with ONLY the search query or NO_TRADE. Nothing else.`;\n\nreturn [{ json: { ...data, ai_prompt: prompt } }];"
+        "jsCode": "const item = $input.first();\nconst data = item.json;\n\nfunction sanitize(text) {\n  return (text || \"\")\n    .replace(/https?:\\/\\/\\S+/g, \"\")\n    .replace(/\\*/g, \"\")\n    .replace(/[\\uD800-\\uDFFF]/g, \"\")\n    .replace(/\\s+/g, \" \")\n    .trim();\n}\n\nconst tweetText = sanitize(data.news_text);\nconst author = data.author || \"\";\nconst followers = data.author_followers || 0;\n\nconst prompt = `You are a Polymarket prediction market expert. Analyze this tweet and determine if it contains breaking news that would affect prediction markets.\n\nTweet: \"${tweetText}\"\nAuthor: @${author} (${followers} followers)\n\nTASK: If this tweet reports a real-world event relevant to prediction markets (elections, policy decisions, geopolitical events, economic announcements, regulatory changes, conflicts, etc.), respond with the best 2-5 word Polymarket search query that will find the most relevant active markets.\n\nIMPORTANT: Your query MUST have at least 2 words. Single-word queries like \"Iran\" or \"Trump\" are too vague. Be specific: combine the actor + action or topic + context.\n\nIf the tweet is a reply, personal opinion, joke, insult, spam, or does NOT relate to any verifiable event that prediction markets would track, respond with exactly: NO_TRADE\n\nExamples of good queries (2-5 words): fed rate cut, iran us war, trump tariff china, ukraine russia ceasefire, israel iran strike, bitcoin price 100k\nExamples of BAD queries (too vague): Iran, Trump, War, Bitcoin\n\nRespond with ONLY the search query or NO_TRADE. Nothing else.`;\n\nreturn [{ json: { ...data, ai_prompt: prompt } }];"
       }
     },
     {
@@ -132,7 +153,10 @@
       "name": "Agente de IA",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [1790, 180],
+      "position": [
+        1790,
+        180
+      ],
       "parameters": {
         "promptType": "define",
         "text": "={{ $json.ai_prompt }}"
@@ -143,7 +167,10 @@
       "name": "Google Gemini Chat Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1,
-      "position": [1790, 400],
+      "position": [
+        1790,
+        400
+      ],
       "parameters": {
         "modelName": "models/gemini-2.5-flash",
         "options": {
@@ -162,7 +189,10 @@
       "name": "Extrair Query IA",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2010, 180],
+      "position": [
+        2010,
+        180
+      ],
       "parameters": {
         "mode": "runOnceForAllItems",
         "jsCode": "const item = $input.first();\nconst response = item.json;\nconst newsData = $('Preparar Prompt IA').first().json;\n\nlet aiQuery = (response.text || response.response || response.output || \"\").trim();\naiQuery = aiQuery.replace(/[\\\"']/g, \"\").replace(/\\s+/g, \" \").trim();\n\nif (!aiQuery || aiQuery.toUpperCase().startsWith(\"NO_\") || aiQuery.toUpperCase() === \"NO\") {\n  return [{ json: { signal: \"NO_TRADE\", reason: \"LLM determinou que o tweet nao e relevante para mercados de predicao\" } }];\n}\n\nreturn [{\n  json: {\n    news_text: newsData.news_text,\n    tweet_id: newsData.tweet_id,\n    tweet_url: newsData.tweet_url,\n    author: newsData.author,\n    author_followers: newsData.author_followers,\n    search_query: aiQuery,\n    ai_query: aiQuery,\n    timestamp: newsData.timestamp\n  }\n}];"
@@ -173,7 +203,10 @@
       "name": "É Relevante?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [2230, 180],
+      "position": [
+        2230,
+        180
+      ],
       "parameters": {
         "conditions": {
           "options": {
@@ -202,17 +235,20 @@
       "name": "Buscar Mercados",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [2450, 180],
+      "position": [
+        2450,
+        180
+      ],
       "parameters": {
         "method": "GET",
-        "url": "https://gamma-api.polymarket.com/markets",
+        "url": "https://gamma-api.polymarket.com/public-search",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "search", "value": "={{ $json.search_query }}" },
-            { "name": "active", "value": "true" },
-            { "name": "closed", "value": "false" },
-            { "name": "limit", "value": "20" }
+            {
+              "name": "q",
+              "value": "={{ $json.search_query }}"
+            }
           ]
         },
         "options": {
@@ -225,10 +261,13 @@
       "name": "Filtrar Mercados",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2670, 180],
+      "position": [
+        2670,
+        180
+      ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const allItems = $input.all();\nconst newsData = $('Extrair Query IA').first().json;\n\nconst queryWords = (newsData.ai_query || \"\").toLowerCase().split(/\\s+/).filter(function(w) { return w.length > 2; });\n\nlet markets = [];\nfor (const item of allItems) {\n  const d = item.json;\n  if (Array.isArray(d)) { markets = markets.concat(d); }\n  else if (d && Array.isArray(d.data)) { markets = markets.concat(d.data); }\n  else if (d && d.id) { markets.push(d); }\n}\n\nconst filtered = markets\n  .filter(function(m) { return m && m.active !== false && m.closed !== true && m.archived !== true; })\n  .filter(function(m) { return parseFloat(m.volumeNum || m.volume || 0) > 500; })\n  .filter(function(m) {\n    if (queryWords.length === 0) return true;\n    const title = (m.question || m.title || \"\").toLowerCase();\n    const desc = (m.description || \"\").toLowerCase().substring(0, 300);\n    const text = title + \" \" + desc;\n    const matchCount = queryWords.filter(function(word) { return text.includes(word); }).length;\n    const threshold = queryWords.length <= 1 ? 1 : 2;\n    return matchCount >= threshold;\n  })\n  .sort(function(a, b) {\n    return parseFloat(b.volumeNum || b.volume || 0) - parseFloat(a.volumeNum || a.volume || 0);\n  })\n  .slice(0, 5);\n\nif (filtered.length === 0) {\n  return [{ json: {\n    signal: \"NO_TRADE\",\n    reason: \"Nenhum mercado relevante encontrado para: \" + (newsData.ai_query || newsData.search_query || \"\")\n  } }];\n}\n\nreturn [{ json: {\n  markets: filtered,\n  market_count: filtered.length,\n  news_text: newsData.news_text,\n  tweet_id: newsData.tweet_id,\n  tweet_url: newsData.tweet_url,\n  author: newsData.author,\n  author_followers: newsData.author_followers,\n  ai_query: newsData.ai_query\n} }];"
+        "jsCode": "const newsData = $('Extrair Query IA').first().json;\nconst responseData = $input.first().json;\n\n// public-search retorna { events: [...], pagination: {...} }\nconst events = responseData.events || [];\n\n// Extrair todos os mercados dos eventos\nlet allMarkets = [];\nfor (const event of events) {\n  if (event.archived) continue;\n  const eventMarkets = event.markets || [];\n  for (const market of eventMarkets) {\n    if (market.active === false || market.closed === true || market.archived === true) continue;\n    allMarkets.push(Object.assign({}, market, {\n      eventSlug: event.slug,\n      eventTitle: event.title\n    }));\n  }\n}\n\n// Filtrar por volume > $500\nallMarkets = allMarkets.filter(function(m) {\n  return parseFloat(m.volumeNum || m.volume || 0) > 500;\n});\n\nif (allMarkets.length === 0) {\n  return [{ json: {\n    signal: 'NO_TRADE',\n    reason: 'Nenhum mercado ativo encontrado para: ' + (newsData.ai_query || newsData.search_query || ''),\n    news_text: newsData.news_text,\n    tweet_id: newsData.tweet_id,\n    author: newsData.author,\n    author_followers: newsData.author_followers,\n    ai_query: newsData.ai_query\n  } }];\n}\n\nconst queryWords = (newsData.ai_query || '').toLowerCase().split(/\\s+/).filter(function(w) { return w.length > 2; });\nconst threshold = queryWords.length >= 3 ? 2 : 1;\n\nconst filtered = allMarkets\n  .filter(function(m) {\n    if (queryWords.length === 0) return true;\n    const text = [\n      m.question || '',\n      (m.description || '').substring(0, 300),\n      m.eventTitle || '',\n      m.groupItemTitle || ''\n    ].join(' ').toLowerCase();\n    const matchCount = queryWords.filter(function(word) { return text.includes(word); }).length;\n    return matchCount >= threshold;\n  })\n  .sort(function(a, b) {\n    return parseFloat(b.volumeNum || b.volume || 0) - parseFloat(a.volumeNum || a.volume || 0);\n  })\n  .slice(0, 5);\n\nif (filtered.length === 0) {\n  return [{ json: {\n    signal: 'NO_TRADE',\n    reason: 'Nenhum mercado passou no filtro de relevancia para: ' + (newsData.ai_query || ''),\n    news_text: newsData.news_text,\n    tweet_id: newsData.tweet_id,\n    author: newsData.author,\n    author_followers: newsData.author_followers,\n    ai_query: newsData.ai_query\n  } }];\n}\n\nreturn [{ json: {\n  markets: filtered,\n  market_count: filtered.length,\n  news_text: newsData.news_text,\n  tweet_id: newsData.tweet_id,\n  tweet_url: newsData.tweet_url,\n  author: newsData.author,\n  author_followers: newsData.author_followers,\n  ai_query: newsData.ai_query,\n  timestamp: newsData.timestamp\n} }];\n"
       }
     },
     {
@@ -236,10 +275,13 @@
       "name": "Gerar Sinal",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2890, 180],
+      "position": [
+        2890,
+        180
+      ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const item = $input.first();\nconst data = item.json;\n\nif (data.signal === \"NO_TRADE\") { return [item]; }\n\nconst markets = data.markets || [];\nif (markets.length === 0) {\n  return [{ json: { signal: \"NO_TRADE\", reason: \"Lista de mercados vazia\" } }];\n}\n\nconst top = markets[0];\nconst news = data.news_text || \"\";\n\nfunction esc(text) {\n  return (text || \"\").replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\");\n}\n\nlet yesPrice = 0.5;\ntry {\n  const prices = typeof top.outcomePrices === \"string\"\n    ? JSON.parse(top.outcomePrices)\n    : (top.outcomePrices || []);\n  yesPrice = parseFloat(prices[0] || 0.5);\n} catch(e) {}\n\nconst volume = parseFloat(top.volumeNum || top.volume || 0);\nconst yesPct = Math.round(yesPrice * 100);\n\nlet direction, expectedTo, confidence;\nif (yesPrice <= 0.30) {\n  direction = \"BUY_YES\";\n  expectedTo = Math.min(yesPct + 20, 95);\n  confidence = 70;\n} else if (yesPrice >= 0.70) {\n  direction = \"BUY_NO\";\n  expectedTo = Math.max(yesPct - 20, 5);\n  confidence = 68;\n} else {\n  direction = \"BUY_YES\";\n  expectedTo = Math.min(yesPct + 12, 95);\n  confidence = 60;\n}\n\nif (volume > 100000) confidence = Math.min(confidence + 8, 88);\nif (volume > 500000) confidence = Math.min(confidence + 5, 88);\n\nconst followers = data.author_followers || 0;\nif (followers > 100000) confidence = Math.min(confidence + 5, 88);\n\nconst eventSlug = (top.events && top.events[0] && top.events[0].slug) || \"\";\nconst marketSlug = top.slug || \"\";\nlet marketUrl;\nif (eventSlug && marketSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + eventSlug + \"/\" + marketSlug;\n} else if (eventSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + eventSlug;\n} else if (marketSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + marketSlug;\n} else if (top.id) {\n  marketUrl = \"https://polymarket.com/markets?id=\" + top.id;\n} else {\n  marketUrl = \"https://polymarket.com/markets?search=\" + encodeURIComponent(data.ai_query || \"\");\n}\nconst question = esc(top.question || top.title || \"N/A\");\nconst newsSummary = esc(news.length > 120 ? news.substring(0, 120) + \"...\" : news);\nconst authorInfo = data.author ? \"@\" + esc(data.author) : \"fonte desconhecida\";\nconst aiQueryInfo = data.ai_query ? \"\\n\\uD83E\\uDD16 <b>Query IA:</b> <code>\" + esc(data.ai_query) + \"</code>\" : \"\";\n\nconst msg = \"\uD83D\uDEA8 <b>ALERTA DE TRADE - POLYMARKET</b>\\n\\n\"\n  + \"\uD83D\uDC26 <b>Tweet de \" + authorInfo + \":</b>\\n\" + newsSummary + \"\\n\\n\"\n  + \"\uD83D\uDCCA <b>Mercado:</b>\\n\" + question + \"\\n\\n\"\n  + \"\uD83C\uDFAF <b>Direcao:</b> <code>\" + direction + \"</code>\\n\"\n  + \"\uD83D\uDCAA <b>Confianca:</b> \" + confidence + \"%\\n\"\n  + \"\uD83D\uDCC8 <b>Movimento:</b> \" + yesPct + \"% \\u2192 \" + expectedTo + \"%\\n\"\n  + \"\uD83D\uDCB0 <b>Volume:</b> $\" + Math.round(volume).toLocaleString(\"en-US\") + aiQueryInfo + \"\\n\\n\"\n  + \"\uD83D\uDD17 \" + marketUrl;\n\nreturn [{ json: {\n  signal: \"TRADE\",\n  market_id: top.id || \"\",\n  market_question: question,\n  market_url: marketUrl,\n  direction: direction,\n  confidence: confidence,\n  expected_from: yesPct,\n  expected_to: expectedTo,\n  current_price_yes: yesPct,\n  volume: volume,\n  news_summary: newsSummary,\n  tweet_id: data.tweet_id || \"\",\n  tweet_url: data.tweet_url || \"\",\n  author: data.author || \"\",\n  author_followers: data.author_followers || 0,\n  ai_query: data.ai_query || \"\",\n  telegram_message: msg,\n  timestamp: new Date().toISOString()\n} }];"
+        "jsCode": "const item = $input.first();\nconst data = item.json;\n\nif (data.signal === \"NO_TRADE\") { return [item]; }\n\nconst markets = data.markets || [];\nif (markets.length === 0) {\n  return [{ json: { signal: \"NO_TRADE\", reason: \"Lista de mercados vazia\" } }];\n}\n\nconst top = markets[0];\nconst news = data.news_text || \"\";\n\nfunction esc(text) {\n  return (text || \"\").replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\");\n}\n\nlet yesPrice = 0.5;\ntry {\n  const prices = typeof top.outcomePrices === \"string\"\n    ? JSON.parse(top.outcomePrices)\n    : (top.outcomePrices || []);\n  yesPrice = parseFloat(prices[0] || 0.5);\n} catch(e) {}\n\nconst volume = parseFloat(top.volumeNum || top.volume || 0);\nconst yesPct = Math.round(yesPrice * 100);\n\nlet direction, expectedTo, confidence;\nif (yesPrice <= 0.30) {\n  direction = \"BUY_YES\";\n  expectedTo = Math.min(yesPct + 20, 95);\n  confidence = 70;\n} else if (yesPrice >= 0.70) {\n  direction = \"BUY_NO\";\n  expectedTo = Math.max(yesPct - 20, 5);\n  confidence = 68;\n} else {\n  direction = \"BUY_YES\";\n  expectedTo = Math.min(yesPct + 12, 95);\n  confidence = 60;\n}\n\nif (volume > 100000) confidence = Math.min(confidence + 8, 88);\nif (volume > 500000) confidence = Math.min(confidence + 5, 88);\n\nconst followers = data.author_followers || 0;\nif (followers > 100000) confidence = Math.min(confidence + 5, 88);\n\nconst eventSlug = top.eventSlug || (top.events && top.events[0] && top.events[0].slug) || \"\";\nconst marketSlug = top.slug || \"\";\nlet marketUrl;\nif (eventSlug && marketSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + eventSlug + \"/\" + marketSlug;\n} else if (eventSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + eventSlug;\n} else if (marketSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + marketSlug;\n} else if (top.id) {\n  marketUrl = \"https://polymarket.com/markets?id=\" + top.id;\n} else {\n  marketUrl = \"https://polymarket.com/markets?search=\" + encodeURIComponent(data.ai_query || \"\");\n}\nconst question = esc(top.question || top.title || \"N/A\");\nconst newsSummary = esc(news.length > 120 ? news.substring(0, 120) + \"...\" : news);\nconst authorInfo = data.author ? \"@\" + esc(data.author) : \"fonte desconhecida\";\nconst aiQueryInfo = data.ai_query ? \"\\n\\uD83E\\uDD16 <b>Query IA:</b> <code>\" + esc(data.ai_query) + \"</code>\" : \"\";\n\nconst msg = \"🚨 <b>ALERTA DE TRADE - POLYMARKET</b>\\n\\n\"\n  + \"🐦 <b>Tweet de \" + authorInfo + \":</b>\\n\" + newsSummary + \"\\n\\n\"\n  + \"📊 <b>Mercado:</b>\\n\" + question + \"\\n\\n\"\n  + \"🎯 <b>Direcao:</b> <code>\" + direction + \"</code>\\n\"\n  + \"💪 <b>Confianca:</b> \" + confidence + \"%\\n\"\n  + \"📈 <b>Movimento:</b> \" + yesPct + \"% \\u2192 \" + expectedTo + \"%\\n\"\n  + \"💰 <b>Volume:</b> $\" + Math.round(volume).toLocaleString(\"en-US\") + aiQueryInfo + \"\\n\\n\"\n  + \"🔗 \" + marketUrl;\n\nreturn [{ json: {\n  signal: \"TRADE\",\n  market_id: top.id || \"\",\n  market_question: question,\n  market_url: marketUrl,\n  direction: direction,\n  confidence: confidence,\n  expected_from: yesPct,\n  expected_to: expectedTo,\n  current_price_yes: yesPct,\n  volume: volume,\n  news_summary: newsSummary,\n  tweet_id: data.tweet_id || \"\",\n  tweet_url: data.tweet_url || \"\",\n  author: data.author || \"\",\n  author_followers: data.author_followers || 0,\n  ai_query: data.ai_query || \"\",\n  telegram_message: msg,\n  timestamp: new Date().toISOString()\n} }];"
       }
     },
     {
@@ -247,7 +289,10 @@
       "name": "Verificar Oportunidade",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [3110, 180],
+      "position": [
+        3110,
+        180
+      ],
       "parameters": {
         "conditions": {
           "options": {
@@ -276,7 +321,10 @@
       "name": "Telegram Alert",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.1,
-      "position": [3330, 80],
+      "position": [
+        3330,
+        80
+      ],
       "parameters": {
         "resource": "message",
         "operation": "sendMessage",
@@ -298,98 +346,221 @@
       "name": "Sem Oportunidade",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [3330, 420],
+      "position": [
+        3330,
+        420
+      ],
       "parameters": {}
     }
   ],
   "connections": {
     "Schedule Trigger": {
       "main": [
-        [{ "node": "Buscar Tweets", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Buscar Tweets",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Buscar Tweets": {
       "main": [
-        [{ "node": "Extrair Tweets", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Extrair Tweets",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Extrair Tweets": {
       "main": [
-        [{ "node": "Processar um por um", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Processar um por um",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Processar um por um": {
       "main": [
-        [{ "node": "Analisar Noticia", "type": "main", "index": 0 }],
+        [
+          {
+            "node": "Analisar Noticia",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     },
     "Analisar Noticia": {
       "main": [
-        [{ "node": "É Recente?", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "É Recente?",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "É Recente?": {
       "main": [
-        [{ "node": "Preparar Prompt IA", "type": "main", "index": 0 }],
-        [{ "node": "Sem Oportunidade", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Preparar Prompt IA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sem Oportunidade",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Preparar Prompt IA": {
       "main": [
-        [{ "node": "Agente de IA", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Agente de IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Google Gemini Chat Model": {
       "ai_languageModel": [
-        [{ "node": "Agente de IA", "type": "ai_languageModel", "index": 0 }]
+        [
+          {
+            "node": "Agente de IA",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
       ]
     },
     "Agente de IA": {
       "main": [
-        [{ "node": "Extrair Query IA", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Extrair Query IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Extrair Query IA": {
       "main": [
-        [{ "node": "É Relevante?", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "É Relevante?",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "É Relevante?": {
       "main": [
-        [{ "node": "Buscar Mercados", "type": "main", "index": 0 }],
-        [{ "node": "Sem Oportunidade", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Buscar Mercados",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sem Oportunidade",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Buscar Mercados": {
       "main": [
-        [{ "node": "Filtrar Mercados", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Filtrar Mercados",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Filtrar Mercados": {
       "main": [
-        [{ "node": "Gerar Sinal", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Gerar Sinal",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Gerar Sinal": {
       "main": [
-        [{ "node": "Verificar Oportunidade", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Verificar Oportunidade",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Verificar Oportunidade": {
       "main": [
-        [{ "node": "Telegram Alert", "type": "main", "index": 0 }],
-        [{ "node": "Sem Oportunidade", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Telegram Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sem Oportunidade",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Telegram Alert": {
       "main": [
-        [{ "node": "Processar um por um", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Processar um por um",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Sem Oportunidade": {
       "main": [
-        [{ "node": "Processar um por um", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Processar um por um",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
