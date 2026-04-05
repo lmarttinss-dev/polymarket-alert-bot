@@ -153,6 +153,62 @@ Pergunta do mercado
 
 ---
 
+## Git workflow
+
+### Branches
+Every improvement, bug fix, or new feature must be developed in a dedicated branch:
+
+```bash
+git checkout -b fix/short-description      # bug fixes
+git checkout -b feat/short-description     # new features
+git checkout -b docs/short-description     # documentation only
+git checkout -b refactor/short-description # refactors
+```
+
+After implementing, commit and open a PR (or merge directly into `main` if working solo):
+
+```bash
+git add <files>
+git commit -m "type: short description"
+git push -u origin <branch>
+# then merge into main
+```
+
+### Commit message style
+All commit messages must be in **English**, following Conventional Commits:
+
+```
+type: short imperative description (max 72 chars)
+
+Optional body explaining the why, not the what.
+```
+
+**Types:**
+
+| Type | When to use |
+|---|---|
+| `feat` | New feature or capability |
+| `fix` | Bug fix |
+| `docs` | Documentation only |
+| `refactor` | Code restructure with no behavior change |
+| `chore` | Maintenance (deps, config, tooling) |
+
+**Examples:**
+```
+feat: add LLM market validation before sending alert
+fix: switch search endpoint to /public-search for real text search
+docs: add CLAUDE.md with project context for Claude Code
+refactor: extract tweet sanitizer into reusable function
+```
+
+**Rules:**
+- Imperative mood: "add" not "added", "fix" not "fixed"
+- No period at the end
+- No uppercase first letter after the colon
+- Reference the *why* in the body when the change isn't self-evident
+
+---
+
 ## Documentação adicional
 
 Toda a documentação está em `docs/pages/`:
