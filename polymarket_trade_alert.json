@@ -164,7 +164,7 @@
     },
     {
       "id": "n16",
-      "name": "Google Gemini Chat Model",
+      "name": "LLM Chat Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1,
       "position": [
@@ -382,7 +382,7 @@
     },
     {
       "id": "n20",
-      "name": "Google Gemini Validação",
+      "name": "LLM Chat Model - Validação",
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1,
       "position": [
@@ -503,7 +503,7 @@
         ]
       ]
     },
-    "Google Gemini Chat Model": {
+    "LLM Chat Model": {
       "ai_languageModel": [
         [
           {
@@ -638,7 +638,7 @@
         ]
       ]
     },
-    "Google Gemini Validação": {
+    "LLM Chat Model - Validação": {
       "ai_languageModel": [
         [
           {

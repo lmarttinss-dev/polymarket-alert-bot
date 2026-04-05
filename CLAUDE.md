@@ -57,7 +57,7 @@ Schedule (30min) → Buscar Tweets (twitterapi.io) → Extrair Tweets
 | n13 | Preparar Prompt IA | Sanitiza tweet e monta prompt |
 | n14 | Agente de IA | Basic LLM Chain (chainLlm) |
 | n15 | Extrair Query IA | Parseia resposta do LLM |
-| n16 | Google Gemini Chat Model | Sub-nó do n14 via ai_languageModel |
+| n16 | LLM Chat Model | Sub-nó do n14 via ai_languageModel |
 | n17 | É Relevante? | IF signal ≠ NO_TRADE |
 
 ---

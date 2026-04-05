@@ -81,7 +81,7 @@ Após importar, vincule as credenciais nos nodes:
 
 | Node | Credencial |
 |---|---|
-| **Agente de IA** → sub-nó **Google Gemini Chat Model** | `Google Gemini API` |
+| **Agente de IA** → sub-nó **LLM Chat Model** | `Google Gemini API` |
 | **Telegram Alert** | `Telegram Bot API` |
 
 ---

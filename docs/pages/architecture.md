@@ -95,12 +95,12 @@
 
 ---
 
-## Sub-nó: Google Gemini Chat Model
+## Sub-nó: LLM Chat Model
 
-O node `Google Gemini Chat Model` (n16) é um sub-nó conectado ao `Agente de IA` via conexão `ai_languageModel`. Não aparece no fluxo principal mas é requisito para o nó de LLM funcionar.
+O node `LLM Chat Model` (n16) é um sub-nó conectado ao `Agente de IA` via conexão `ai_languageModel`. Não aparece no fluxo principal mas é requisito para o nó de LLM funcionar.
 
 ```
-Google Gemini Chat Model (n16)
+LLM Chat Model (n16)
   └── ai_languageModel ──► Agente de IA (n14)
 ```
 

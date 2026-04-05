@@ -171,13 +171,13 @@ TASK: If relevant → respond with 2-5 word search query
 | typeVersion | 1.4 |
 | Prompt | `={{ $json.ai_prompt }}` |
 
-Basic LLM Chain conectado ao sub-nó `Google Gemini Chat Model` via `ai_languageModel`.
+Basic LLM Chain conectado ao sub-nó `LLM Chat Model` via `ai_languageModel`.
 
 **Saída:** `{ text: "israel iran war" }` ou `{ text: "NO_TRADE" }`
 
 ---
 
-## n16 — Google Gemini Chat Model
+## n16 — LLM Chat Model
 
 | Propriedade | Valor |
 |---|---|
@@ -371,11 +371,11 @@ Prepara o prompt de validação para o LLM. Se o input já for `NO_TRADE` (sem m
 | Tipo | `@n8n/n8n-nodes-langchain.chainLlm` |
 | typeVersion | 1.4 |
 
-Basic LLM Chain que chama o Gemini com o prompt de validação. Sub-nó: `Google Gemini Validação` (n20).
+Basic LLM Chain que chama o Gemini com o prompt de validação. Sub-nó: `LLM Chat Model - Validação` (n20).
 
 ---
 
-## n20 — Google Gemini Validação
+## n20 — LLM Chat Model - Validação
 
 | Propriedade | Valor |
 |---|---|
