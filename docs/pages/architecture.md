@@ -145,13 +145,21 @@ Ciclo 10: SplitInBatches → T10 → pipeline → resultado → SplitInBatches
 
 ## Propagação de NO_TRADE
 
-O sinal `NO_TRADE` pode ser emitido em cinco pontos diferentes:
+O sinal `NO_TRADE` pode ser emitido em seis pontos diferentes:
 
 ```
 n5 Analisar Noticia ──► NO_TRADE (tweet > 35 min)
                               │
                               ▼
 n6 É Recente? ────────► branch false → Sem Oportunidade → próximo tweet
+
+n13 Preparar Prompt IA ► NO_TRADE (pré-filtro: YouTube + < 5.000 seguidores)
+                              │
+                              ▼
+n15 Extrair Query IA ──► detecta pre_no_trade=true → { signal: "NO_TRADE" }
+                              │
+                              ▼
+n17 É Relevante? ──────► branch false → Sem Oportunidade → próximo tweet
 
 n14 Agente de IA ─────► LLM retorna "NO_TRADE" (tweet irrelevante)
                               │
@@ -185,9 +193,9 @@ n10 Verificar Oportunidade → branch NÃO → Sem Oportunidade → próximo twe
 | Iteração | Processar um por um | Garantir processamento isolado por tweet |
 | Filtragem temporal | Analisar Noticia | Descartar tweets com mais de 35 minutos |
 | Roteamento | É Recente? | Bifurcar tweets recentes dos descartados |
-| Preparação | Preparar Prompt IA | Sanitizar tweet e montar prompt para LLM |
+| Preparação | Preparar Prompt IA | Pré-filtrar fontes de baixa credibilidade (YouTube + poucos seguidores); sanitizar tweet e montar prompt para LLM |
 | Inteligência | Agente de IA + Gemini | Avaliar relevância e gerar query de busca |
-| Extração | Extrair Query IA | Parsear saída do LLM, detectar NO_TRADE |
+| Extração | Extrair Query IA | Respeitar pré-filtro do n13; parsear saída do LLM, detectar NO_TRADE |
 | Roteamento | É Relevante? | Bifurcar tweets relevantes dos descartados pelo LLM |
 | Dados externos | Buscar Mercados | Única integração com Polymarket |
 | Filtragem | Filtrar Mercados | Garantir relevância (threshold dinâmico) e qualidade dos mercados |

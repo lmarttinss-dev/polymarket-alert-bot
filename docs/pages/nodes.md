@@ -140,9 +140,23 @@ Recebe de volta (`Telegram Alert` e `Sem Oportunidade`) para avançar ao próxim
 | typeVersion | 2 |
 | Mode | `runOnceForAllItems` |
 
-Sanitiza o texto do tweet e monta o prompt para o LLM.
+Sanitiza o texto do tweet e monta o prompt para o LLM. Também aplica um **pré-filtro hard-coded** que descarta fontes de baixa credibilidade antes de chamar o Gemini.
 
-**Sanitização aplicada:**
+**Pré-filtro (sem custo de LLM):**
+
+Se o tweet contém uma referência ao YouTube (`via @YouTube`, `youtube.com` ou `youtu.be`) **E** o autor tem menos de 5.000 seguidores, o node retorna imediatamente com `pre_no_trade: true`, sem montar prompt nem consumir tokens.
+
+```js
+const hasYouTubeRef = /via @YouTube|youtube\.com|youtu\.be/i.test(originalText);
+const isLowCredibility = followers < 5000;
+
+if (hasYouTubeRef && isLowCredibility) {
+  return [{ json: { ...data, ai_prompt: "NO_TRADE", pre_no_trade: true,
+    pre_no_trade_reason: "YouTube link from low-follower account (< 5000 followers)" } }];
+}
+```
+
+**Sanitização aplicada (quando passa do pré-filtro):**
 - Remove URLs (`https://...`)
 - Remove asteriscos (`*`) — evita filtros de segurança do Gemini
 - Remove emojis (surrogate pairs Unicode)
@@ -157,9 +171,17 @@ Author: @<autor> (<seguidores> followers)
 
 TASK: If relevant → respond with 2-5 word search query
       If not relevant → respond with exactly: NO_TRADE
+
+DISQUALIFY with NO_TRADE if ANY of the following apply:
+- Tweet shares/links to a YouTube video ("via @YouTube", "youtu.be", etc.)
+- Author has fewer than 10,000 followers AND claim is unverified
+- Tweet text is clearly a video title or clickbait headline
+- Reply, personal opinion, joke, insult, or spam
 ```
 
-**Saída:** `{ ...dados_do_tweet, ai_prompt: "..." }`
+**Saída (pré-filtro ativado):** `{ ...dados_do_tweet, ai_prompt: "NO_TRADE", pre_no_trade: true, pre_no_trade_reason: "..." }`
+
+**Saída (fluxo normal):** `{ ...dados_do_tweet, ai_prompt: "..." }`
 
 ---
 
@@ -203,8 +225,9 @@ Sub-nó conectado ao `Agente de IA` via `ai_languageModel`. Não aparece no canv
 Parseia a saída do LLM. Tenta os campos `text`, `response` e `output` em sequência.
 
 **Lógica:**
-- Se output vazio ou começar com `"NO_"` → retorna `{ signal: "NO_TRADE" }`
-- Caso contrário → retorna dados do tweet + `search_query` + `ai_query`
+1. Se `newsData.pre_no_trade === true` (flag setada pelo pré-filtro do n13) → retorna `{ signal: "NO_TRADE" }` imediatamente, ignorando a resposta do LLM
+2. Se output vazio ou começar com `"NO_"` → retorna `{ signal: "NO_TRADE" }`
+3. Caso contrário → retorna dados do tweet + `search_query` + `ai_query`
 
 **Saída (relevante):**
 ```json

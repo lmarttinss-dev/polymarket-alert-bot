@@ -137,8 +137,9 @@ O n8 recebe dados do n7 (Buscar Mercados), mas precisa dos dados do tweet (autho
 
 O sinal `NO_TRADE` pode surgir em:
 1. **n5** — tweet com mais de 35 minutos → n6 descarta
-2. **n14/n15** — LLM julga irrelevante → n17 descarta
-3. **n8** — nenhum mercado encontrado ou passou no filtro → n9/n10 descarta
+2. **n13** — pré-filtro hard-coded: YouTube + autor < 5.000 seguidores → seta `pre_no_trade: true`, n15 descarta sem consumir LLM
+3. **n14/n15** — LLM julga irrelevante → n17 descarta
+4. **n8** — nenhum mercado encontrado ou passou no filtro → n9/n10 descarta
 
 ---
 
