@@ -172,7 +172,7 @@
         400
       ],
       "parameters": {
-        "modelName": "models/gemini-2.5-flash",
+        "modelName": "models/gemini-3-flash-preview",
         "options": {
           "maxOutputTokens": 50
         }
@@ -390,7 +390,7 @@
         300
       ],
       "parameters": {
-        "modelName": "models/gemini-2.5-flash",
+        "modelName": "models/gemini-3-flash-preview",
         "options": {
           "maxOutputTokens": 10
         }
@@ -454,7 +454,7 @@
         300
       ],
       "parameters": {
-        "modelName": "models/gemini-2.5-flash",
+        "modelName": "models/gemini-3-flash-preview",
         "options": {
           "maxOutputTokens": 10
         }

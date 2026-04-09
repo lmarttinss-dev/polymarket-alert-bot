@@ -205,7 +205,7 @@ Basic LLM Chain conectado ao sub-nó `LLM Chat Model` via `ai_languageModel`.
 |---|---|
 | Tipo | `@n8n/n8n-nodes-langchain.lmChatGoogleGemini` |
 | typeVersion | 1 |
-| Modelo | `models/gemini-2.5-flash` |
+| Modelo | `models/gemini-3-flash-preview` |
 | Max Output Tokens | 50 |
 
 Sub-nó conectado ao `Agente de IA` via `ai_languageModel`. Não aparece no canvas principal.
@@ -407,7 +407,7 @@ Basic LLM Chain que chama o Gemini com o prompt de validação. Sub-nó: `LLM Ch
 | Propriedade | Valor |
 |---|---|
 | Tipo | `@n8n/n8n-nodes-langchain.lmChatGoogleGemini` |
-| Modelo | `models/gemini-2.5-flash` |
+| Modelo | `models/gemini-3-flash-preview` |
 | maxOutputTokens | 10 |
 
 Sub-nó do `Validar Mercado IA`. maxOutputTokens reduzido a 10 pois a resposta esperada é apenas `YES` ou `NO`.
@@ -467,7 +467,7 @@ Basic LLM Chain que chama o Gemini com o prompt de sentimento. Sub-nó: `LLM Cha
 | Propriedade | Valor |
 |---|---|
 | Tipo | `@n8n/n8n-nodes-langchain.lmChatGoogleGemini` |
-| Modelo | `models/gemini-2.5-flash` |
+| Modelo | `models/gemini-3-flash-preview` |
 | maxOutputTokens | 10 |
 
 Sub-nó do `Agente Sentimento IA`. maxOutputTokens reduzido a 10 pois a resposta esperada é apenas `POSITIVE` ou `NEGATIVE`.

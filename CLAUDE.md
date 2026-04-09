@@ -105,7 +105,7 @@ Não há arquivo `.env` ou sistema de credenciais externo. Tudo está inline no 
 
 ### Google Gemini — via n8n LangChain
 - Node: `@n8n/n8n-nodes-langchain.chainLlm` (Basic LLM Chain, typeVersion 1.4)
-- Modelo: `models/gemini-2.5-flash`
+- Modelo: `models/gemini-3-flash-preview`
 - Credencial tipo: `googlePalmApi`
 - Output: `response.text` (não `response.content` nem `response.output`)
 
