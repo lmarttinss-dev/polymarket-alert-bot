@@ -276,12 +276,12 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3550,
+        4430,
         180
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const item = $input.first();\nconst data = item.json;\n\nif (data.signal === \"NO_TRADE\") { return [item]; }\n\nconst markets = data.markets || [];\nif (markets.length === 0) {\n  return [{ json: { signal: \"NO_TRADE\", reason: \"Lista de mercados vazia\" } }];\n}\n\nconst top = markets[0];\nconst news = data.news_text || \"\";\n\nfunction esc(text) {\n  return (text || \"\").replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\");\n}\n\nlet yesPrice = 0.5;\ntry {\n  const prices = typeof top.outcomePrices === \"string\"\n    ? JSON.parse(top.outcomePrices)\n    : (top.outcomePrices || []);\n  yesPrice = parseFloat(prices[0] || 0.5);\n} catch(e) {}\n\nconst volume = parseFloat(top.volumeNum || top.volume || 0);\nconst yesPct = Math.round(yesPrice * 100);\n\nlet direction, expectedTo, confidence;\nif (yesPrice <= 0.30) {\n  direction = \"BUY_YES\";\n  expectedTo = Math.min(yesPct + 20, 95);\n  confidence = 70;\n} else if (yesPrice >= 0.70) {\n  direction = \"BUY_NO\";\n  expectedTo = Math.max(yesPct - 20, 5);\n  confidence = 68;\n} else {\n  direction = \"BUY_YES\";\n  expectedTo = Math.min(yesPct + 12, 95);\n  confidence = 60;\n}\n\nif (volume > 100000) confidence = Math.min(confidence + 8, 88);\nif (volume > 500000) confidence = Math.min(confidence + 5, 88);\n\nconst followers = data.author_followers || 0;\nif (followers > 100000) confidence = Math.min(confidence + 5, 88);\n\nconst eventSlug = top.eventSlug || (top.events && top.events[0] && top.events[0].slug) || \"\";\nconst marketSlug = top.slug || \"\";\nlet marketUrl;\nif (eventSlug && marketSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + eventSlug + \"/\" + marketSlug;\n} else if (eventSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + eventSlug;\n} else if (marketSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + marketSlug;\n} else if (top.id) {\n  marketUrl = \"https://polymarket.com/markets?id=\" + top.id;\n} else {\n  marketUrl = \"https://polymarket.com/markets?search=\" + encodeURIComponent(data.ai_query || \"\");\n}\nconst question = esc(top.question || top.title || \"N/A\");\nconst newsSummary = esc(news.length > 120 ? news.substring(0, 120) + \"...\" : news);\nconst authorInfo = data.author ? \"@\" + esc(data.author) : \"fonte desconhecida\";\nconst aiQueryInfo = data.ai_query ? \"\\n\\uD83E\\uDD16 <b>Query IA:</b> <code>\" + esc(data.ai_query) + \"</code>\" : \"\";\n\nconst msg = \"🚨 <b>ALERTA DE TRADE - POLYMARKET</b>\\n\\n\"\n  + \"🐦 <b>Tweet de \" + authorInfo + \":</b>\\n\" + newsSummary + \"\\n\\n\"\n  + \"📊 <b>Mercado:</b>\\n\" + question + \"\\n\\n\"\n  + \"🎯 <b>Direcao:</b> <code>\" + direction + \"</code>\\n\"\n  + \"💪 <b>Confianca:</b> \" + confidence + \"%\\n\"\n  + \"📈 <b>Movimento:</b> \" + yesPct + \"% \\u2192 \" + expectedTo + \"%\\n\"\n  + \"💰 <b>Volume:</b> $\" + Math.round(volume).toLocaleString(\"en-US\") + aiQueryInfo + \"\\n\\n\"\n  + \"🐦 \" + (data.tweet_url || \"\") + \"\\n\"\n  + \"🔗 \" + marketUrl;\n\nreturn [{ json: {\n  signal: \"TRADE\",\n  market_id: top.id || \"\",\n  market_question: question,\n  market_url: marketUrl,\n  direction: direction,\n  confidence: confidence,\n  expected_from: yesPct,\n  expected_to: expectedTo,\n  current_price_yes: yesPct,\n  volume: volume,\n  news_summary: newsSummary,\n  tweet_id: data.tweet_id || \"\",\n  tweet_url: data.tweet_url || \"\",\n  author: data.author || \"\",\n  author_followers: data.author_followers || 0,\n  ai_query: data.ai_query || \"\",\n  telegram_message: msg,\n  timestamp: new Date().toISOString()\n} }];"
+        "jsCode": "const item = $input.first();\nconst data = item.json;\n\nif (data.signal === \"NO_TRADE\") { return [item]; }\n\nconst markets = data.markets || [];\nif (markets.length === 0) {\n  return [{ json: { signal: \"NO_TRADE\", reason: \"Lista de mercados vazia\" } }];\n}\n\nconst top = markets[0];\nconst news = data.news_text || \"\";\n\nfunction esc(text) {\n  return (text || \"\").replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\");\n}\n\nlet yesPrice = 0.5;\ntry {\n  const prices = typeof top.outcomePrices === \"string\"\n    ? JSON.parse(top.outcomePrices)\n    : (top.outcomePrices || []);\n  yesPrice = parseFloat(prices[0] || 0.5);\n} catch(e) {}\n\nconst volume = parseFloat(top.volumeNum || top.volume || 0);\nconst yesPct = Math.round(yesPrice * 100);\n\nconst sentiment = data.sentiment || \"POSITIVE\";\nlet direction, expectedTo, confidence;\nif (sentiment === \"NEGATIVE\") {\n  direction = \"BUY_NO\";\n  expectedTo = Math.max(yesPct - (yesPrice >= 0.70 ? 20 : 12), 5);\n  confidence = yesPrice >= 0.70 ? 68 : 60;\n} else {\n  direction = \"BUY_YES\";\n  expectedTo = Math.min(yesPct + (yesPrice <= 0.30 ? 20 : 12), 95);\n  confidence = yesPrice <= 0.30 ? 70 : 60;\n}\n\nif (volume > 100000) confidence = Math.min(confidence + 8, 88);\nif (volume > 500000) confidence = Math.min(confidence + 5, 88);\n\nconst followers = data.author_followers || 0;\nif (followers > 100000) confidence = Math.min(confidence + 5, 88);\n\nconst eventSlug = top.eventSlug || (top.events && top.events[0] && top.events[0].slug) || \"\";\nconst marketSlug = top.slug || \"\";\nlet marketUrl;\nif (eventSlug && marketSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + eventSlug + \"/\" + marketSlug;\n} else if (eventSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + eventSlug;\n} else if (marketSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + marketSlug;\n} else if (top.id) {\n  marketUrl = \"https://polymarket.com/markets?id=\" + top.id;\n} else {\n  marketUrl = \"https://polymarket.com/markets?search=\" + encodeURIComponent(data.ai_query || \"\");\n}\nconst question = esc(top.question || top.title || \"N/A\");\nconst newsSummary = esc(news.length > 120 ? news.substring(0, 120) + \"...\" : news);\nconst authorInfo = data.author ? \"@\" + esc(data.author) : \"fonte desconhecida\";\nconst aiQueryInfo = data.ai_query ? \"\\n\\uD83E\\uDD16 <b>Query IA:</b> <code>\" + esc(data.ai_query) + \"</code>\" : \"\";\n\nconst msg = \"🚨 <b>ALERTA DE TRADE - POLYMARKET</b>\\n\\n\"\n  + \"🐦 <b>Tweet de \" + authorInfo + \":</b>\\n\" + newsSummary + \"\\n\\n\"\n  + \"📊 <b>Mercado:</b>\\n\" + question + \"\\n\\n\"\n  + \"🎯 <b>Direcao:</b> <code>\" + direction + \"</code>\\n\"\n  + \"💪 <b>Confianca:</b> \" + confidence + \"%\\n\"\n  + \"📈 <b>Movimento:</b> \" + yesPct + \"% \\u2192 \" + expectedTo + \"%\\n\"\n  + \"💰 <b>Volume:</b> $\" + Math.round(volume).toLocaleString(\"en-US\") + aiQueryInfo + \"\\n\\n\"\n  + \"🐦 \" + (data.tweet_url || \"\") + \"\\n\"\n  + \"🔗 \" + marketUrl;\n\nreturn [{ json: {\n  signal: \"TRADE\",\n  market_id: top.id || \"\",\n  market_question: question,\n  market_url: marketUrl,\n  direction: direction,\n  confidence: confidence,\n  expected_from: yesPct,\n  expected_to: expectedTo,\n  current_price_yes: yesPct,\n  volume: volume,\n  news_summary: newsSummary,\n  tweet_id: data.tweet_id || \"\",\n  tweet_url: data.tweet_url || \"\",\n  author: data.author || \"\",\n  author_followers: data.author_followers || 0,\n  ai_query: data.ai_query || \"\",\n  telegram_message: msg,\n  timestamp: new Date().toISOString()\n} }];"
       }
     },
     {
@@ -290,7 +290,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        3770,
+        4650,
         180
       ],
       "parameters": {
@@ -322,7 +322,7 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.1,
       "position": [
-        3990,
+        4870,
         80
       ],
       "parameters": {
@@ -347,7 +347,7 @@
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        3990,
+        4870,
         420
       ],
       "parameters": {}
@@ -414,6 +414,70 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "jsCode": "const llmOutput = $input.first().json;\nconst originalData = $('Filtrar Mercados').first().json;\n\n// Caso skip: NO_TRADE original ou sem mercados — propagar sem validar\nif (originalData.signal === 'NO_TRADE' || !originalData.markets || originalData.skip_validation) {\n  return [{ json: originalData }];\n}\n\nconst answer = (llmOutput.response && llmOutput.response.text\n  ? llmOutput.response.text\n  : llmOutput.text || llmOutput.output || ''\n).trim().toUpperCase();\n\nif (!answer.startsWith('YES')) {\n  return [{ json: {\n    signal: 'NO_TRADE',\n    reason: 'Validação LLM: mercado não relevante para esta notícia',\n    news_text: originalData.news_text,\n    tweet_id: originalData.tweet_id,\n    tweet_url: originalData.tweet_url,\n    author: originalData.author,\n    author_followers: originalData.author_followers,\n    ai_query: originalData.ai_query\n  } }];\n}\n\nreturn [{ json: originalData }];\n"
+      }
+    },
+    {
+      "id": "n22",
+      "name": "Preparar Sentimento IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3550,
+        180
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const item = $input.first();\nconst d = item.json;\n\n// Se NO_TRADE ou sem mercados, skip — não chamar o LLM\nif (d.signal === 'NO_TRADE' || !d.markets || d.markets.length === 0) {\n  return [{ json: { ...d, skip_sentiment: true, ai_sentiment_prompt: '' } }];\n}\n\nfunction sanitize(text) {\n  return (text || '')\n    .replace(/https?:\\/\\/\\S+/g, '')\n    .replace(/\\*/g, '')\n    .replace(/[\\uD800-\\uDFFF]/g, '')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nconst market = d.markets[0];\nconst news = sanitize(d.news_text).substring(0, 250);\n\nconst prompt = `You are a Polymarket prediction market expert.\n\nNews tweet: \"${news}\"\nMarket question: \"${market.question}\"\n\nIs this news POSITIVE or NEGATIVE for the YES outcome of this market?\n- POSITIVE: the news increases the probability that YES is correct\n- NEGATIVE: the news decreases the probability that YES is correct\n\nAnswer with only POSITIVE or NEGATIVE.`;\n\nreturn [{ json: { ...d, skip_sentiment: false, ai_sentiment_prompt: prompt } }];"
+      }
+    },
+    {
+      "id": "n23",
+      "name": "Agente Sentimento IA",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        3770,
+        180
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.ai_sentiment_prompt }}"
+      }
+    },
+    {
+      "id": "n24",
+      "name": "LLM Chat Model - Sentimento",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        3770,
+        300
+      ],
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {
+          "maxOutputTokens": 10
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "1",
+          "name": "Google Gemini API"
+        }
+      }
+    },
+    {
+      "id": "n25",
+      "name": "Extrair Sentimento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3990,
+        180
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const llmOutput = $input.first().json;\nconst originalData = $('Preparar Sentimento IA').first().json;\n\n// Se skip (NO_TRADE ou sem mercados), propagar sem alterar\nif (originalData.skip_sentiment || originalData.signal === 'NO_TRADE') {\n  return [{ json: originalData }];\n}\n\nconst answer = (llmOutput.response && llmOutput.response.text\n  ? llmOutput.response.text\n  : llmOutput.text || llmOutput.output || ''\n).trim().toUpperCase();\n\nconst sentiment = answer.startsWith('NEGATIVE') ? 'NEGATIVE' : 'POSITIVE';\n\nreturn [{ json: { ...originalData, sentiment } }];"
       }
     }
   ],
@@ -661,6 +725,50 @@
       ]
     },
     "Extrair Validação": {
+      "main": [
+        [
+          {
+            "node": "Preparar Sentimento IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Sentimento IA": {
+      "main": [
+        [
+          {
+            "node": "Agente Sentimento IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Chat Model - Sentimento": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agente Sentimento IA",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agente Sentimento IA": {
+      "main": [
+        [
+          {
+            "node": "Extrair Sentimento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair Sentimento": {
       "main": [
         [
           {

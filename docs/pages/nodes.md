@@ -426,5 +426,67 @@ Parseia a resposta do LLM de validação via backreference `$('Filtrar Mercados'
 
 **Lógica de decisão:**
 1. Se `originalData.signal === 'NO_TRADE'` ou `skip_validation === true` → propaga `originalData` direto, ignorando a resposta do LLM
-2. Se resposta começa com `YES` → passa `originalData` (com `markets[]`) para `Gerar Sinal`
+2. Se resposta começa com `YES` → passa `originalData` (com `markets[]`) para `Preparar Sentimento IA`
 3. Qualquer outra resposta (incluindo `NO`, vazio ou resposta inesperada) → retorna `{ signal: "NO_TRADE", reason: "Validação LLM: mercado não relevante para esta notícia" }`
+
+---
+
+## n22 — Preparar Sentimento IA
+
+| Propriedade | Valor |
+|---|---|
+| Tipo | `n8n-nodes-base.code` |
+| typeVersion | 2 |
+| Mode | `runOnceForAllItems` |
+
+Monta o prompt de análise de sentimento para o LLM.
+
+**Skip sem custo:** se o input já for `NO_TRADE` ou sem mercados, seta `skip_sentiment: true` com prompt vazio — o chainLlm n23 ainda executa, mas o n25 detecta o flag e ignora a resposta.
+
+**Sanitização:** aplica o mesmo `sanitize()` do n13 (remove URLs, asteriscos e emojis) antes de montar o prompt.
+
+**Prompt gerado (quando há mercado):**
+> "Is this news POSITIVE or NEGATIVE for the YES outcome of this market? POSITIVE: the news increases the probability that YES is correct. NEGATIVE: the news decreases the probability that YES is correct."
+
+---
+
+## n23 — Agente Sentimento IA
+
+| Propriedade | Valor |
+|---|---|
+| Tipo | `@n8n/n8n-nodes-langchain.chainLlm` |
+| typeVersion | 1.4 |
+| Prompt | `={{ $json.ai_sentiment_prompt }}` |
+
+Basic LLM Chain que chama o Gemini com o prompt de sentimento. Sub-nó: `LLM Chat Model - Sentimento` (n24).
+
+---
+
+## n24 — LLM Chat Model - Sentimento
+
+| Propriedade | Valor |
+|---|---|
+| Tipo | `@n8n/n8n-nodes-langchain.lmChatGoogleGemini` |
+| Modelo | `models/gemini-2.5-flash` |
+| maxOutputTokens | 10 |
+
+Sub-nó do `Agente Sentimento IA`. maxOutputTokens reduzido a 10 pois a resposta esperada é apenas `POSITIVE` ou `NEGATIVE`.
+
+---
+
+## n25 — Extrair Sentimento
+
+| Propriedade | Valor |
+|---|---|
+| Tipo | `n8n-nodes-base.code` |
+| typeVersion | 2 |
+| Mode | `runOnceForAllItems` |
+
+Parseia a resposta do LLM de sentimento via backreference `$('Preparar Sentimento IA').first().json`.
+
+**Lógica de decisão:**
+1. Se `skip_sentiment === true` ou `signal === 'NO_TRADE'` → propaga `originalData` direto, sem alterar
+2. Se resposta começa com `NEGATIVE` → adiciona `{ sentiment: "NEGATIVE" }` ao objeto
+3. Qualquer outra resposta → assume `{ sentiment: "POSITIVE" }` (default seguro)
+
+**Saída:** `originalData` com campo adicional `sentiment: "POSITIVE" | "NEGATIVE"`

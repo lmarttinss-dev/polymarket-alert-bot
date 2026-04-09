@@ -29,16 +29,20 @@ O node `Gerar Sinal` usa **sempre o primeiro** da lista (maior volume), que repr
 
 ## Regras de Direção
 
+A direção é determinada pela **análise de sentimento do LLM** (n22–n25): o Gemini avalia se a notícia é positiva ou negativa para o resultado YES do mercado.
+
 ```
 yesPrice = outcomePrices[0]   // preço atual do YES (0.0 a 1.0)
 yesPct   = round(yesPrice * 100)
+sentiment = "POSITIVE" | "NEGATIVE"   // saída do LLM (n25)
 ```
 
-| Condição | Direção | Lógica |
+| Sentimento LLM | Direção | Lógica |
 |---|---|---|
-| `yesPrice <= 0.30` | `BUY_YES` | Mercado subprecificado — notícia aumenta chance de YES |
-| `yesPrice >= 0.70` | `BUY_NO` | Mercado superprecificado — notícia diminui chance de YES |
-| `0.31 <= yesPrice <= 0.69` | `BUY_YES` | Zona neutra — assume viés de alta com menor confiança |
+| `POSITIVE` | `BUY_YES` | A notícia aumenta a probabilidade de YES ser correto |
+| `NEGATIVE` | `BUY_NO` | A notícia diminui a probabilidade de YES ser correto |
+
+> O sentimento é avaliado especificamente para a pergunta do mercado encontrado, não de forma genérica. O LLM recebe o tweet e a pergunta do mercado e decide: "Esta notícia torna mais ou menos provável que o YES desta pergunta se concretize?"
 
 ---
 
@@ -46,11 +50,13 @@ yesPct   = round(yesPrice * 100)
 
 ### Base
 
+A confiança base ainda usa o preço atual do YES para calibrar a magnitude — preços extremos indicam maior convicção do mercado, validando o sinal.
+
 | Condição de entrada | Confiança base |
 |---|---|
-| `yesPrice <= 0.30` | 70% |
-| `yesPrice >= 0.70` | 68% |
-| `0.31–0.69` (zona neutra) | 60% |
+| Sentimento `POSITIVE` + `yesPrice <= 0.30` | 70% |
+| Sentimento `NEGATIVE` + `yesPrice >= 0.70` | 68% |
+| Sentimento qualquer, preço na zona neutra | 60% |
 
 ### Bônus por Volume
 
@@ -80,13 +86,14 @@ total    = 83%  (cap: 88%)
 
 ## Cálculo do Movimento Esperado
 
-O movimento esperado é o range de preço projetado pelo sistema, dado em pontos percentuais de probabilidade.
+O movimento esperado é o range de preço projetado pelo sistema, dado em pontos percentuais de probabilidade. A magnitude continua calibrada pelo preço atual, independente do sentimento.
 
-| Direção | Fórmula | Cap |
-|---|---|---|
-| `BUY_YES` (yesPrice ≤ 0.30) | `expectedTo = yesPct + 20` | máx 95% |
-| `BUY_YES` (zona neutra) | `expectedTo = yesPct + 12` | máx 95% |
-| `BUY_NO` | `expectedTo = yesPct - 20` | mín 5% |
+| Direção | Condição de preço | Fórmula | Cap |
+|---|---|---|---|
+| `BUY_YES` | `yesPrice <= 0.30` | `expectedTo = yesPct + 20` | máx 95% |
+| `BUY_YES` | zona neutra | `expectedTo = yesPct + 12` | máx 95% |
+| `BUY_NO` | `yesPrice >= 0.70` | `expectedTo = yesPct - 20` | mín 5% |
+| `BUY_NO` | zona neutra | `expectedTo = yesPct - 12` | mín 5% |
 
 **Exemplo na mensagem Telegram:**
 ```
@@ -100,18 +107,21 @@ Significa: o YES está em 22% e o sistema projeta que chegue a 42%.
 
 ```
                     ┌──────────────────┐
-                    │  yesPrice atual  │
+                    │ Sentimento LLM   │  n25 — POSITIVE ou NEGATIVE
                     └────────┬─────────┘
                              │
-              ┌──────────────┼──────────────┐
-              │              │              │
-         ≤ 30%          31%–69%          ≥ 70%
-              │              │              │
-          BUY_YES        BUY_YES        BUY_NO
-          base=70%       base=60%       base=68%
-          +20pts         +12pts         -20pts
-              │              │              │
-              └──────────────┼──────────────┘
+              ┌──────────────┴──────────────┐
+              │                             │
+          POSITIVE                      NEGATIVE
+              │                             │
+          BUY_YES                       BUY_NO
+              │                             │
+     ┌────────┴────────┐         ┌──────────┴──────────┐
+  ≤30% → +20pts      else        ≥70% → -20pts       else
+  base=70%         +12pts        base=68%           -12pts
+                   base=60%                         base=60%
+              │                             │
+              └──────────────┬──────────────┘
                              │
                     ┌────────┴────────┐
                     │  Bônus Volume   │
@@ -136,16 +146,16 @@ Significa: o YES está em 22% e o sistema projeta que chegue a 42%.
 
 ---
 
-## Limitações do MVP
+## Melhorias Futuras
 
-A lógica de direção é determinística e baseada apenas no preço atual do YES.
+**Implementadas:**
+- Validação LLM do mercado (n18–n21) — confirma relevância antes de gerar sinal
+- Análise de sentimento LLM (n22–n25) — detecta direção POSITIVE/NEGATIVE automaticamente
 
-**Melhorias recomendadas para produção:**
+**Recomendadas para produção:**
 
 | Melhoria | Descrição |
 |---|---|
-| Validação LLM do mercado | Perguntar ao LLM se o mercado encontrado realmente corresponde à notícia antes de gerar sinal |
-| Análise de sentimento | Usar o LLM para detectar se a notícia é positiva ou negativa para o YES do mercado |
 | Dados históricos de preço | Comparar com volatilidade passada do mercado |
 | Spread bid/ask | Incorporar o spread real para calcular o ponto de breakeven |
 | Stop loss automático | Definir nível de saída com base no risco |

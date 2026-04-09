@@ -85,8 +85,26 @@
 └──────┬───────────────┘  skip_validation → propaga sem ler resposta   │ │
        │                                                                │ │
        ▼                                                                │ │
+┌──────────────────────┐                                                │ │
+│ Preparar Sentimento  │  n22 — Sanitiza tweet e monta prompt           │ │
+│        IA            │  POSITIVE/NEGATIVE; skip se NO_TRADE           │ │
+└──────┬───────────────┘                                                │ │
+       │                                                                │ │
+       ▼                                                                │ │
 ┌──────────────────┐                                                    │ │
-│  Gerar Sinal     │  n9 — Calcula direção, confiança, mensagem HTML   │ │
+│ Agente Sentimento│  n23 — LLM detecta se notícia é POSITIVE/NEGATIVE│ │
+│      IA          │  Sub-nó: LLM Chat Model - Sentimento (n24)       │ │
+└──────┬───────────┘                                                    │ │
+       │                                                                │ │
+       ▼                                                                │ │
+┌──────────────────────┐                                                │ │
+│  Extrair Sentimento  │  n25 — POSITIVE → BUY_YES | NEGATIVE → BUY_NO│ │
+└──────┬───────────────┘  skip_sentiment → propaga sem ler resposta    │ │
+       │                                                                │ │
+       ▼                                                                │ │
+┌──────────────────┐                                                    │ │
+│  Gerar Sinal     │  n9 — Usa sentiment para direção, calcula         │ │
+│                  │  confiança e monta mensagem HTML                  │ │
 └──────┬───────────┘                                                    │ │
        │                                                                │ │
        ▼                                                                │ │
@@ -111,13 +129,19 @@
 
 ---
 
-## Sub-nó: LLM Chat Model
+## Sub-nós LLM
 
-O node `LLM Chat Model` (n16) é um sub-nó conectado ao `Agente de IA` via conexão `ai_languageModel`. Não aparece no fluxo principal mas é requisito para o nó de LLM funcionar.
+Cada `chainLlm` requer um sub-nó de modelo conectado via `ai_languageModel`:
 
 ```
 LLM Chat Model (n16)
   └── ai_languageModel ──► Agente de IA (n14)
+
+LLM Chat Model - Validação (n20)
+  └── ai_languageModel ──► Validar Mercado IA (n19)
+
+LLM Chat Model - Sentimento (n24)
+  └── ai_languageModel ──► Agente Sentimento IA (n23)
 ```
 
 ---
@@ -175,6 +199,12 @@ n8 Filtrar Mercados ───► NO_TRADE (nenhum mercado com ≥ 2 palavras mat
 n21 Extrair Validação ─► NO_TRADE (LLM rejeitou: mercado não bate com notícia)
                               │
                               ▼
+n22 Preparar Sentimento IA → skip se NO_TRADE (skip_sentiment: true)
+                              │
+                              ▼
+n25 Extrair Sentimento ─► propaga NO_TRADE se skip_sentiment
+                              │
+                              ▼
 n9 Gerar Sinal ────────► detecta NO_TRADE, propaga sem alterar
                               │
                               ▼
@@ -202,7 +232,10 @@ n10 Verificar Oportunidade → branch NÃO → Sem Oportunidade → próximo twe
 | Preparação | Preparar Validação IA | Sanitizar tweet e montar prompt de validação YES/NO |
 | Validação | Validar Mercado IA + LLM | Confirmar se mercado encontrado bate com a notícia |
 | Extração | Extrair Validação | Parsear YES/NO, emitir NO_TRADE se mercado rejeitado |
-| Decisão | Gerar Sinal | Calcular direção, confiança e montar mensagem |
+| Preparação | Preparar Sentimento IA | Sanitizar tweet e montar prompt POSITIVE/NEGATIVE |
+| Sentimento | Agente Sentimento IA + LLM | Detectar se notícia é positiva ou negativa para o YES |
+| Extração | Extrair Sentimento | Parsear POSITIVE/NEGATIVE, propagar NO_TRADE se skip |
+| Decisão | Gerar Sinal | Usar sentiment para direção, calcular confiança e montar mensagem |
 | Roteamento | Verificar Oportunidade | Bifurcar entre alerta e descarte |
 | Saída | Telegram Alert | Notificar oportunidade em HTML |
 | Descarte | Sem Oportunidade | Encerrar silenciosamente branches sem oportunidade |
@@ -240,6 +273,8 @@ Buscar Mercados ────────────► { events: [ { title, mar
 Filtrar Mercados ───────────► { markets[], market_count,
                                  news_text, tweet_id, author,
                                  author_followers, ai_query }
+                                    │
+Extrair Sentimento ─────────► { ...dados, sentiment: "POSITIVE"|"NEGATIVE" }
                                     │
 Gerar Sinal ────────────────► { signal, direction, confidence,
                                  expected_from, expected_to,

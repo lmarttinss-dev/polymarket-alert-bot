@@ -40,7 +40,9 @@ Schedule (30min) → Buscar Tweets (twitterapi.io) → Extrair Tweets
   → SplitInBatches (1 por vez) → Analisar Noticia (filtro 35min)
   → É Recente? → Preparar Prompt IA → Agente de IA (Gemini)
   → Extrair Query IA → É Relevante? → Buscar Mercados (Polymarket)
-  → Filtrar Mercados → Gerar Sinal → Verificar Oportunidade
+  → Filtrar Mercados → Preparar Validação IA → Validar Mercado IA
+  → Extrair Validação → Preparar Sentimento IA → Agente Sentimento IA
+  → Extrair Sentimento → Gerar Sinal → Verificar Oportunidade
   → Telegram Alert
 ```
 
@@ -71,6 +73,10 @@ Schedule (30min) → Buscar Tweets (twitterapi.io) → Extrair Tweets
 | n19 | Validar Mercado IA | Basic LLM Chain — confirma se mercado bate com notícia |
 | n20 | LLM Chat Model - Validação | Sub-nó do n19 via ai_languageModel |
 | n21 | Extrair Validação | Parseia YES/NO; propaga NO_TRADE se rejeitado ou skip_validation |
+| n22 | Preparar Sentimento IA | Sanitiza tweet e monta prompt POSITIVE/NEGATIVE; skip se NO_TRADE |
+| n23 | Agente Sentimento IA | Basic LLM Chain — detecta se notícia é positiva ou negativa para o YES |
+| n24 | LLM Chat Model - Sentimento | Sub-nó do n23 via ai_languageModel |
+| n25 | Extrair Sentimento | Parseia POSITIVE/NEGATIVE; propaga NO_TRADE se skip_sentiment |
 
 ---
 
@@ -139,7 +145,9 @@ O sinal `NO_TRADE` pode surgir em:
 1. **n5** — tweet com mais de 35 minutos → n6 descarta
 2. **n13** — pré-filtro hard-coded: YouTube + autor < 5.000 seguidores → seta `pre_no_trade: true`, n15 descarta sem consumir LLM
 3. **n14/n15** — LLM julga irrelevante → n17 descarta
-4. **n8** — nenhum mercado encontrado ou passou no filtro → n9/n10 descarta
+4. **n8** — nenhum mercado encontrado ou passou no filtro → n18/n21 propagam
+5. **n21** — LLM de validação rejeitou o mercado → n22 recebe e propaga via skip_sentiment
+6. **n9/n10** — qualquer NO_TRADE chega ao n9, que propaga; n10 descarta
 
 ---
 
