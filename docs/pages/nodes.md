@@ -101,7 +101,8 @@ Recebe de volta (`Telegram Alert` e `Sem Oportunidade`) para avançar ao próxim
 
 **Lógica:**
 1. Propaga `NO_TRADE` se vier do n3
-2. Calcula idade do tweet via `createdAt` — descarta se > 35 min
+2. **Deduplicação** via `$getWorkflowStaticData('global')`: armazena `{ tweet_id: timestamp }` entre execuções; descarta tweet já visto com NO_TRADE. TTL de 2 horas — entradas mais antigas são limpas automaticamente a cada execução.
+3. Calcula idade do tweet via `createdAt` — descarta se > 35 min
 
 > A extração de keywords foi removida. A análise de relevância é feita pelo LLM (n14).
 
