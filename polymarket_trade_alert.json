@@ -545,32 +545,14 @@
     {
       "id": "n29",
       "name": "Buscar Reddit",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
       "position": [
         470,
         520
       ],
       "parameters": {
-        "method": "GET",
-        "url": "https://oauth.reddit.com/r/worldnews+Economics/new?limit=25&sort=new",
-        "authentication": "none",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "={{ 'Bearer ' + $json.access_token }}"
-            },
-            {
-              "name": "User-Agent",
-              "value": "n8n:polymarket-alert-bot:1.0 (by /u/REDDIT_USERNAME)"
-            }
-          ]
-        },
-        "options": {
-          "timeout": 10000
-        }
+        "url": "https://www.reddit.com/r/worldnews+Economics/new.rss"
       }
     },
     {
@@ -584,7 +566,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const item = $input.first();\nconst data = item.json;\n\nconst children = (data.data && data.data.children) || [];\n\nif (children.length === 0) {\n  return [{ json: { signal: \"NO_TRADE\", reason: \"Nenhum post retornado pelo Reddit\" } }];\n}\n\nreturn children\n  .filter(function(child) {\n    const p = child.data || {};\n    // Ignorar posts fixados (stickied) e posts sem título\n    return !p.stickied && p.title;\n  })\n  .map(function(child) {\n    const p = child.data || {};\n\n    // Texto: título + corpo resumido se for self-post\n    let text = p.title || \"\";\n    if (p.is_self && p.selftext && p.selftext.length > 0 && p.selftext !== \"[removed]\") {\n      const excerpt = p.selftext.substring(0, 200).replace(/\\n+/g, \" \").trim();\n      text = text + \" — \" + excerpt;\n    }\n\n    // Converte Unix timestamp para ISO string\n    const createdAt = p.created_utc\n      ? new Date(p.created_utc * 1000).toISOString()\n      : new Date().toISOString();\n\n    const permalink = p.permalink || \"\";\n    const url = permalink ? \"https://reddit.com\" + permalink : \"\";\n\n    return {\n      json: {\n        id: \"reddit_\" + (p.id || \"\"),\n        text: text,\n        author: p.author || \"\",\n        // Reddit não expõe seguidores por post; usa score como proxy\n        // mínimo de 10000 para não ser barrado pelo filtro de credibilidade\n        author_followers: Math.max((p.score || 0) * 100, 10000),\n        author_verified: false,\n        createdAt: createdAt,\n        retweetCount: 0,\n        likeCount: p.score || 0,\n        viewCount: 0,\n        url: url,\n        isReply: false,\n        source: \"reddit\",\n        subreddit: p.subreddit || \"\"\n      }\n    };\n  });"
+        "jsCode": "const items = $input.all();\n\nif (items.length === 0) {\n  return [{ json: { signal: \"NO_TRADE\", reason: \"Nenhum post retornado pelo Reddit RSS\" } }];\n}\n\nreturn items\n  .filter(function(item) {\n    const d = item.json;\n    return d.title && d.link;\n  })\n  .map(function(item) {\n    const d = item.json;\n\n    // Extrai ID do post a partir da URL\n    // Formato: https://www.reddit.com/r/worldnews/comments/abc123/titulo/\n    const urlMatch = (d.link || d.guid || \"\").match(/\\/comments\\/([a-z0-9]+)\\//i);\n    const postId = urlMatch ? urlMatch[1] : (d.guid || d.link || \"\").replace(/[^a-z0-9]/gi, \"\").substring(0, 12);\n\n    // Extrai subreddit da URL\n    const subMatch = (d.link || \"\").match(/\\/r\\/([^\\/]+)\\//i);\n    const subreddit = subMatch ? subMatch[1] : \"reddit\";\n\n    // Texto: título + snippet de conteúdo se disponível e diferente do título\n    let text = d.title || \"\";\n    const snippet = (d.contentSnippet || \"\").trim();\n    if (snippet && snippet !== d.title) {\n      const excerpt = snippet.substring(0, 200).replace(/\\n+/g, \" \").trim();\n      text = text + \" — \" + excerpt;\n    }\n\n    // Autor: remove prefixo /u/ se presente\n    const author = (d.author || d.creator || \"\").replace(/^\\/u\\//, \"\").trim();\n\n    // Data de publicação\n    const createdAt = d.isoDate || (d.pubDate ? new Date(d.pubDate).toISOString() : new Date().toISOString());\n\n    return {\n      json: {\n        id: \"reddit_\" + postId,\n        text: text,\n        author: author,\n        // RSS não expõe score/votos; usa mínimo fixo para passar o filtro de credibilidade\n        author_followers: 10000,\n        author_verified: false,\n        createdAt: createdAt,\n        retweetCount: 0,\n        likeCount: 0,\n        viewCount: 0,\n        url: d.link || \"\",\n        isReply: false,\n        source: \"reddit\",\n        subreddit: subreddit\n      }\n    };\n  });"
       }
     },
     {
@@ -599,47 +581,6 @@
       "parameters": {
         "mode": "append"
       }
-    },
-    {
-      "id": "n32",
-      "name": "Buscar Token Reddit",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        250,
-        520
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "https://www.reddit.com/api/v1/access_token",
-        "authentication": "none",
-        "sendBody": true,
-        "contentType": "form-urlencoded",
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "grant_type",
-              "value": "client_credentials"
-            }
-          ]
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "={{ 'Basic ' + Buffer.from('REDDIT_CLIENT_ID:REDDIT_CLIENT_SECRET').toString('base64') }}"
-            },
-            {
-              "name": "User-Agent",
-              "value": "n8n:polymarket-alert-bot:1.0 (by /u/REDDIT_USERNAME)"
-            }
-          ]
-        },
-        "options": {
-          "timeout": 10000
-        }
-      }
     }
   ],
   "connections": {
@@ -652,7 +593,7 @@
             "index": 0
           },
           {
-            "node": "Buscar Token Reddit",
+            "node": "Buscar Reddit",
             "type": "main",
             "index": 0
           }
@@ -961,17 +902,6 @@
         [
           {
             "node": "Responder Telegram",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Buscar Token Reddit": {
-      "main": [
-        [
-          {
-            "node": "Buscar Reddit",
             "type": "main",
             "index": 0
           }

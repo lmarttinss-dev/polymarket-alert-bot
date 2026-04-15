@@ -37,7 +37,7 @@ Para editar o workflow, edite este JSON diretamente. A estrutura é:
 
 ```
 Schedule (30min) → Buscar Tweets (twitterapi.io) → Extrair Tweets ──┐
-                → Buscar Token Reddit → Buscar Reddit (worldnews+Economics) → Extrair Posts Reddit ─┘
+                → Buscar Reddit RSS (worldnews+Economics) → Extrair Posts Reddit ─┘
                                                         → Merge Fontes
   → SplitInBatches (1 por vez) → Analisar Noticia (filtro 35min)
   → É Recente? → Preparar Prompt IA → Agente de IA (Gemini)
@@ -81,10 +81,9 @@ Telegram Comando (mensagem do usuário) → Processar Comando → Responder Tele
 | n23 | Agente Sentimento IA | Basic LLM Chain — detecta se notícia é positiva ou negativa para o YES |
 | n24 | LLM Chat Model - Sentimento | Sub-nó do n23 via ai_languageModel |
 | n25 | Extrair Sentimento | Parseia POSITIVE/NEGATIVE; propaga NO_TRADE se skip_sentiment |
-| n29 | Buscar Reddit | GET oauth.reddit.com/r/worldnews+Economics/new — 25 posts mais recentes (OAuth Bearer) |
-| n30 | Extrair Posts Reddit | Normaliza posts do Reddit para o mesmo formato de tweet (id, text, author, createdAt, url, source) |
+| n29 | Buscar Reddit | RSS Feed Read — `reddit.com/r/worldnews+Economics/new.rss` sem autenticação |
+| n30 | Extrair Posts Reddit | Normaliza itens RSS (title, link, isoDate, author) para o mesmo formato de tweet (id, text, author, createdAt, url, source) |
 | n31 | Merge Fontes | Combina tweets (n3) e posts Reddit (n30) em modo append antes do SplitInBatches |
-| n32 | Buscar Token Reddit | POST /api/v1/access_token — obtém Bearer token via OAuth client_credentials antes de n29 |
 | n26 | Telegram Comando | Telegram Trigger — recebe comandos de configuração do usuário |
 | n27 | Processar Comando | Parseia /filtros, /ativar, /desativar; atualiza userFilters no static data |
 | n28 | Responder Telegram | Envia resposta HTML ao usuário via Telegram |
@@ -98,7 +97,6 @@ Não há arquivo `.env` ou sistema de credenciais externo. Tudo está inline no 
 - **n2 Buscar Tweets** — header `X-API-Key` com a chave da twitterapi.io
 - **n11 Telegram Alert** — `chatId` hardcoded
 - **n16 Google Gemini** — credencial referenciada por ID interno do n8n (configurada na instância)
-- **n32 Buscar Token Reddit** — `REDDIT_CLIENT_ID` e `REDDIT_CLIENT_SECRET` hardcoded no header `Authorization`; `REDDIT_USERNAME` no `User-Agent`
 
 ---
 
@@ -169,48 +167,28 @@ O sinal `NO_TRADE` pode surgir em:
 
 ## Reddit como fonte de notícias
 
-### Autenticação OAuth (client credentials)
+### Por que RSS e não a API JSON?
 
-O endpoint público `.json` do Reddit bloqueia IPs de cloud (403 "You've been blocked by network security"). A solução é usar **OAuth app-only auth**:
-
-1. Registre um app do tipo **script** em https://www.reddit.com/prefs/apps
-2. Obtenha `client_id` (abaixo do nome do app) e `client_secret`
-3. No arquivo JSON, no node **n32**, substitua:
-   - `REDDIT_CLIENT_ID` → seu client_id
-   - `REDDIT_CLIENT_SECRET` → seu client_secret
-   - `REDDIT_USERNAME` → seu username do Reddit (em ambos os nodes n32 e n29)
-
-**n32 (Buscar Token Reddit):**
-- `POST https://www.reddit.com/api/v1/access_token`
-- Header: `Authorization: Basic base64(client_id:client_secret)` (construído via expressão n8n)
-- Body: `grant_type=client_credentials`
-- Retorna: `{ access_token: "...", token_type: "bearer", expires_in: 86400 }`
-
-**n29 (Buscar Reddit):**
-- `GET https://oauth.reddit.com/r/worldnews+Economics/new?limit=25&sort=new`
-- Header: `Authorization: Bearer {{ $json.access_token }}`
-- O token vem do output de n32 via expressão
+O endpoint público `.json` do Reddit bloqueia IPs de cloud (403 "You've been blocked by network security"). A API OAuth exige pré-aprovação desde novembro de 2025 (Responsible Builder Policy). A solução é usar o **feed RSS público**, que não requer autenticação e não é bloqueado de cloud IPs.
 
 ### API utilizada
-- **Token URL:** `POST https://www.reddit.com/api/v1/access_token`
-- **Data URL:** `GET https://oauth.reddit.com/r/worldnews+Economics/new?limit=25&sort=new`
-- **Auth:** OAuth client_credentials (Bearer token)
-- **User-Agent obrigatório:** `n8n:polymarket-alert-bot:1.0 (by /u/REDDIT_USERNAME)`
+- **URL:** `GET https://www.reddit.com/r/worldnews+Economics/new.rss`
+- **Node:** `n8n-nodes-base.rssFeedRead` (RSS Feed Read, typeVersion 1)
+- **Auth:** nenhuma
 - O operador `+` na URL busca os dois subreddits em uma única chamada
 
 ### Normalização (n30)
 Posts do Reddit são convertidos para o mesmo formato de tweet que o restante do pipeline espera:
 
-| Campo Reddit | Campo normalizado | Observação |
+| Campo RSS | Campo normalizado | Observação |
 |---|---|---|
-| `data.id` | `id` | Prefixado com `reddit_` para evitar colisão com IDs de tweet |
-| `data.title` + `data.selftext` | `text` | selftext limitado a 200 chars; ignorado se `[removed]` |
-| `data.author` | `author` | username do Reddit |
-| `max(score * 100, 10000)` | `author_followers` | Proxy: score alto → mais credibilidade; mínimo 10k para não ser barrado pelo filtro geopolítico |
-| `data.created_utc * 1000` | `createdAt` | Unix → ISO string |
-| `https://reddit.com` + `permalink` | `url` | Link direto ao post |
+| `link` (URL do post) | `id` | ID extraído via regex `/comments/([a-z0-9]+)/`, prefixado com `reddit_` |
+| `title` + `contentSnippet` | `text` | snippet limitado a 200 chars, concatenado ao título |
+| `author` / `creator` | `author` | prefixo `/u/` removido se presente |
+| fixo `10000` | `author_followers` | RSS não expõe votos; mínimo para passar o filtro de credibilidade |
+| `isoDate` / `pubDate` | `createdAt` | ISO string |
+| `link` | `url` | Link direto ao post |
 | `"reddit"` | `source` | Distingue de tweets no n9 |
-| `data.stickied === true` | filtrado | Posts fixados são descartados |
 
 ### Mensagem Telegram para posts Reddit
 Quando `source === "reddit"`, o n9 usa formato diferente:
