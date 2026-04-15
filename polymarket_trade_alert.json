@@ -553,14 +553,18 @@
       ],
       "parameters": {
         "method": "GET",
-        "url": "https://www.reddit.com/r/worldnews+Economics/new.json?limit=25&sort=new",
+        "url": "https://oauth.reddit.com/r/worldnews+Economics/new?limit=25&sort=new",
         "authentication": "none",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $json.access_token }}"
+            },
+            {
               "name": "User-Agent",
-              "value": "n8n:polymarket-alert-bot:1.0"
+              "value": "n8n:polymarket-alert-bot:1.0 (by /u/REDDIT_USERNAME)"
             }
           ]
         },
@@ -595,6 +599,47 @@
       "parameters": {
         "mode": "append"
       }
+    },
+    {
+      "id": "n32",
+      "name": "Buscar Token Reddit",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        250,
+        520
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.reddit.com/api/v1/access_token",
+        "authentication": "none",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "grant_type",
+              "value": "client_credentials"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Basic ' + Buffer.from('REDDIT_CLIENT_ID:REDDIT_CLIENT_SECRET').toString('base64') }}"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n:polymarket-alert-bot:1.0 (by /u/REDDIT_USERNAME)"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      }
     }
   ],
   "connections": {
@@ -607,7 +652,7 @@
             "index": 0
           },
           {
-            "node": "Buscar Reddit",
+            "node": "Buscar Token Reddit",
             "type": "main",
             "index": 0
           }
@@ -916,6 +961,17 @@
         [
           {
             "node": "Responder Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Token Reddit": {
+      "main": [
+        [
+          {
+            "node": "Buscar Reddit",
             "type": "main",
             "index": 0
           }
