@@ -517,3 +517,59 @@ Parseia a resposta do LLM de sentimento via backreference `$('Preparar Sentiment
 3. Qualquer outra resposta → assume `{ sentiment: "POSITIVE" }` (default seguro)
 
 **Saída:** `originalData` com campo adicional `sentiment: "POSITIVE" | "NEGATIVE"`
+
+---
+
+## n26 — Telegram Comando
+
+| Propriedade | Valor |
+|---|---|
+| Tipo | `n8n-nodes-base.telegramTrigger` |
+| typeVersion | 1.1 |
+| Updates | `message` |
+
+Trigger dedicado a receber comandos de configuração enviados pelo usuário via Telegram. Executa em paralelo ao fluxo principal (Schedule Trigger), ativado a cada mensagem recebida pelo bot.
+
+---
+
+## n27 — Processar Comando
+
+| Propriedade | Valor |
+|---|---|
+| Tipo | `n8n-nodes-base.code` |
+| typeVersion | 2 |
+| Mode | `runOnceForAllItems` |
+
+Parseia comandos do Telegram e atualiza os filtros de categoria do usuário em `$getWorkflowStaticData('global').userFilters`.
+
+**Segurança:** só processa mensagens do `chatId` autorizado (`2074413015`). Mensagens de outros usuários são ignoradas (`return []`).
+
+**Comandos suportados:**
+
+| Comando | Descrição |
+|---|---|
+| `/filtros` | Exibe status atual de cada categoria |
+| `/categorias` | Alias de `/filtros` |
+| `/ativar <categoria>` | Ativa uma categoria desativada |
+| `/desativar <categoria>` | Desativa uma categoria ativa |
+| `/help` / `/start` | Exibe lista de comandos e categorias |
+
+**Categorias disponíveis:** `geopolitica`, `crypto`, `economia`, `esportes`
+
+O argumento aceita tanto a forma acentuada (`geopolítica`) quanto sem acento (`geopolitica`), graças à normalização NFD.
+
+**Proteção anti-bloqueio:** não permite desativar a última categoria ativa.
+
+**Saída:** `{ chat_id: string, response_text: string }` (HTML para o Telegram)
+
+---
+
+## n28 — Responder Telegram
+
+| Propriedade | Valor |
+|---|---|
+| Tipo | `n8n-nodes-base.telegram` |
+| typeVersion | 1.1 |
+| `parse_mode` | `HTML` |
+
+Envia a resposta do n27 de volta ao usuário via Telegram.

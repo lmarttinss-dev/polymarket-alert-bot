@@ -145,7 +145,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const item = $input.first();\nconst data = item.json;\n\nfunction sanitize(text) {\n  return (text || \"\")\n    .replace(/https?:\\/\\/\\S+/g, \"\")\n    .replace(/\\*/g, \"\")\n    .replace(/[\\uD800-\\uDFFF]/g, \"\")\n    .replace(/\\s+/g, \" \")\n    .trim();\n}\n\nconst originalText = data.news_text || \"\";\nconst tweetText = sanitize(originalText);\nconst author = data.author || \"\";\nconst followers = data.author_followers || 0;\n\nconst isVerified = data.author_verified || false;\n\n// ── Credibility score ─────────────────────────────────────────────────────\nlet credibilityScore = 0;\nif (followers >= 1000000) credibilityScore += 50;\nelse if (followers >= 100000) credibilityScore += 30;\nelse if (followers >= 10000) credibilityScore += 15;\nelse if (followers >= 1000) credibilityScore += 5;\nif (isVerified) credibilityScore += 20;\n\n// ── Geopolitical pre-filter: accounts < 1k followers are unreliable ────────\nconst GEOPOLITICAL_PATTERN = /\\b(war|attacked?|missile|nuclear|invasion|invaded?|military|troops|sanctions?|ceasefire|coup|conflict|elections?|nato|treaty|bombing?|airstrike|explosion|assassination|hostage|forces|army|navy|president|prime\\s+minister)\\b/i;\nconst isGeopolitical = GEOPOLITICAL_PATTERN.test(originalText);\n\nif (isGeopolitical && followers < 1000) {\n  return [{ json: { ...data, ai_prompt: \"NO_TRADE\", pre_no_trade: true, pre_no_trade_reason: `Geopolitical news from low-credibility account (${followers} followers, verified: ${isVerified})`, credibility_score: credibilityScore } }];\n}\n\n// Pre-filter: YouTube links from low-credibility accounts are not primary news sources\nconst hasYouTubeRef = /via @YouTube|youtube\\.com|youtu\\.be/i.test(originalText);\nconst isLowCredibility = followers < 5000;\n\nif (hasYouTubeRef && isLowCredibility) {\n  return [{ json: { ...data, ai_prompt: \"NO_TRADE\", pre_no_trade: true, pre_no_trade_reason: \"YouTube link from low-follower account (< 5000 followers)\", credibility_score: credibilityScore, author_verified: isVerified } }];\n}\n\nconst prompt = `You are a Polymarket prediction market expert. Analyze this tweet and determine if it contains breaking news that would affect prediction markets.\n\nTweet: \"${tweetText}\"\nAuthor: @${author} (${followers} followers)\n\nTASK: If this tweet reports a real-world event relevant to prediction markets (elections, policy decisions, geopolitical events, economic announcements, regulatory changes, conflicts, etc.), respond with the best 2-5 word Polymarket search query that will find the most relevant active markets.\n\nRULES for your query:\n- Use 2 to 5 words minimum\n- Use full English words only — no abbreviations, no ticker symbols, no acronyms\n- Never use ALL CAPS words (write 'bitcoin' not 'BTC' or 'BIT', 'federal reserve' not 'FED', 'artificial intelligence' not 'AI')\n- Be specific: combine the actor + action or topic + context\n- Focus on the event, not the asset price\n\nDISQUALIFY with NO_TRADE if ANY of the following apply:\n- The tweet shares or links to a YouTube video (content like \"via @YouTube\", \"youtu.be\", commentary, video titles)\n- The tweet is a retweet or quote of a video rather than original reporting\n- The author has fewer than 10,000 followers AND the claim is unverified or unattributed\n- The tweet text is clearly a video title or clickbait headline without factual detail\n- The tweet is a reply, personal opinion, joke, insult, or spam\n- The tweet does NOT relate to any verifiable event that prediction markets would track\n\nExamples of GOOD queries: fed rate cut, iran nuclear deal, trump china tariff, ukraine russia ceasefire, bitcoin etf approval, israel iran attack\nExamples of BAD queries (never do this): BIT, BTC, FED, AI, Iran, Trump, Bitcoin\n\nRespond with ONLY the search query or NO_TRADE. Nothing else.`;\n\nreturn [{ json: { ...data, ai_prompt: prompt, credibility_score: credibilityScore, author_verified: isVerified } }];"
+        "jsCode": "const item = $input.first();\nconst data = item.json;\n\nfunction sanitize(text) {\n  return (text || \"\")\n    .replace(/https?:\\/\\/\\S+/g, \"\")\n    .replace(/\\*/g, \"\")\n    .replace(/[\\uD800-\\uDFFF]/g, \"\")\n    .replace(/\\s+/g, \" \")\n    .trim();\n}\n\nconst originalText = data.news_text || \"\";\nconst tweetText = sanitize(originalText);\nconst author = data.author || \"\";\nconst followers = data.author_followers || 0;\n\nconst isVerified = data.author_verified || false;\n\n// ── Credibility score ─────────────────────────────────────────────────────\nlet credibilityScore = 0;\nif (followers >= 1000000) credibilityScore += 50;\nelse if (followers >= 100000) credibilityScore += 30;\nelse if (followers >= 10000) credibilityScore += 15;\nelse if (followers >= 1000) credibilityScore += 5;\nif (isVerified) credibilityScore += 20;\n\n// ── Geopolitical pre-filter: accounts < 1k followers are unreliable ────────\nconst GEOPOLITICAL_PATTERN = /\\b(war|attacked?|missile|nuclear|invasion|invaded?|military|troops|sanctions?|ceasefire|coup|conflict|elections?|nato|treaty|bombing?|airstrike|explosion|assassination|hostage|forces|army|navy|president|prime\\s+minister)\\b/i;\nconst isGeopolitical = GEOPOLITICAL_PATTERN.test(originalText);\n\nif (isGeopolitical && followers < 1000) {\n  return [{ json: { ...data, ai_prompt: \"NO_TRADE\", pre_no_trade: true, pre_no_trade_reason: `Geopolitical news from low-credibility account (${followers} followers, verified: ${isVerified})`, credibility_score: credibilityScore } }];\n}\n\n\n// ── Category filter: check user preferences ─────────────────────────────\nconst staticData = $getWorkflowStaticData('global');\nconst userFilters = staticData.userFilters || { geopolitica: true, crypto: true, economia: true, esportes: true };\n\nconst CATEGORIES = {\n  geopolitica: /\\b(war|attack(ed|s)?|missile|nuclear|invasion|invade[sd]?|military|troops|sanctions?|ceasefire|coup|conflict|elections?|nato|treaty|bombing?|airstrike|explosion|assassination|hostage|forces|army|navy|president|prime\\s+minister)\\b/i,\n  crypto:      /\\b(bitcoin|ethereum|crypto(currency)?|blockchain|defi|nft|tokens?|binance|coinbase|altcoin|stablecoin|solana|ripple|xrp|dogecoin|web3)\\b/i,\n  economia:    /\\b(fed|federal\\s+reserve|interest\\s+rate|rate\\s+(cut|hike)|inflation|gdp|jobs\\s+report|tariffs?|trade\\s+(deal|war)|recession|imf|treasury|deficit|unemployment|dow\\s+jones|s&p|nasdaq|stock\\s+market)\\b/i,\n  esportes:    /\\b(nba|nfl|world\\s+cup|championship|olympics|super\\s*bowl|fifa|formula\\s*(1|one)|ufc|wimbledon|euro\\s*(cup)?|tournament)\\b/i\n};\n\nconst matchedCategories = Object.keys(CATEGORIES).filter(cat => CATEGORIES[cat].test(originalText));\n\nif (matchedCategories.length > 0) {\n  const hasActiveCategory = matchedCategories.some(cat => userFilters[cat] !== false);\n  if (!hasActiveCategory) {\n    return [{ json: { ...data, ai_prompt: \"NO_TRADE\", pre_no_trade: true,\n      pre_no_trade_reason: `Category disabled by user filters: ${matchedCategories.join(', ')}`,\n      credibility_score: credibilityScore, author_verified: isVerified } }];\n  }\n}\n\n// Pre-filter: YouTube links from low-credibility accounts are not primary news sources\nconst hasYouTubeRef = /via @YouTube|youtube\\.com|youtu\\.be/i.test(originalText);\nconst isLowCredibility = followers < 5000;\n\nif (hasYouTubeRef && isLowCredibility) {\n  return [{ json: { ...data, ai_prompt: \"NO_TRADE\", pre_no_trade: true, pre_no_trade_reason: \"YouTube link from low-follower account (< 5000 followers)\", credibility_score: credibilityScore, author_verified: isVerified } }];\n}\n\nconst prompt = `You are a Polymarket prediction market expert. Analyze this tweet and determine if it contains breaking news that would affect prediction markets.\n\nTweet: \"${tweetText}\"\nAuthor: @${author} (${followers} followers)\n\nTASK: If this tweet reports a real-world event relevant to prediction markets (elections, policy decisions, geopolitical events, economic announcements, regulatory changes, conflicts, etc.), respond with the best 2-5 word Polymarket search query that will find the most relevant active markets.\n\nRULES for your query:\n- Use 2 to 5 words minimum\n- Use full English words only — no abbreviations, no ticker symbols, no acronyms\n- Never use ALL CAPS words (write 'bitcoin' not 'BTC' or 'BIT', 'federal reserve' not 'FED', 'artificial intelligence' not 'AI')\n- Be specific: combine the actor + action or topic + context\n- Focus on the event, not the asset price\n\nDISQUALIFY with NO_TRADE if ANY of the following apply:\n- The tweet shares or links to a YouTube video (content like \"via @YouTube\", \"youtu.be\", commentary, video titles)\n- The tweet is a retweet or quote of a video rather than original reporting\n- The author has fewer than 10,000 followers AND the claim is unverified or unattributed\n- The tweet text is clearly a video title or clickbait headline without factual detail\n- The tweet is a reply, personal opinion, joke, insult, or spam\n- The tweet does NOT relate to any verifiable event that prediction markets would track\n\nExamples of GOOD queries: fed rate cut, iran nuclear deal, trump china tariff, ukraine russia ceasefire, bitcoin etf approval, israel iran attack\nExamples of BAD queries (never do this): BIT, BTC, FED, AI, Iran, Trump, Bitcoin\n\nRespond with ONLY the search query or NO_TRADE. Nothing else.`;\n\nreturn [{ json: { ...data, ai_prompt: prompt, credibility_score: credibilityScore, author_verified: isVerified } }];"
       }
     },
     {
@@ -479,6 +479,68 @@
         "mode": "runOnceForAllItems",
         "jsCode": "const llmOutput = $input.first().json;\nconst originalData = $('Preparar Sentimento IA').first().json;\n\n// Se skip (NO_TRADE ou sem mercados), propagar sem alterar\nif (originalData.skip_sentiment || originalData.signal === 'NO_TRADE') {\n  return [{ json: originalData }];\n}\n\nconst answer = (llmOutput.response && llmOutput.response.text\n  ? llmOutput.response.text\n  : llmOutput.text || llmOutput.output || ''\n).trim().toUpperCase();\n\nconst sentiment = answer.startsWith('NEGATIVE') ? 'NEGATIVE' : 'POSITIVE';\n\nreturn [{ json: { ...originalData, sentiment } }];"
       }
+    },
+    {
+      "id": "n26",
+      "name": "Telegram Comando",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        250,
+        620
+      ],
+      "webhookId": "polymarket-bot-filter-commands",
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram Bot API"
+        }
+      }
+    },
+    {
+      "id": "n27",
+      "name": "Processar Comando",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        470,
+        620
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const item = $input.first();\nconst message = item.json.message || {};\nconst text = (message.text || '').trim();\nconst chatId = message.chat && message.chat.id ? String(message.chat.id) : null;\n\n// Só processa mensagens do chat autorizado\nconst AUTHORIZED_CHAT_ID = '2074413015';\nif (!chatId || chatId !== AUTHORIZED_CHAT_ID) { return []; }\n\n// Só processa comandos (começam com /)\nif (!text.startsWith('/')) { return []; }\n\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.userFilters) {\n  staticData.userFilters = {\n    geopolitica: true,\n    crypto: true,\n    economia: true,\n    esportes: true\n  };\n}\n\nconst VALID_CATEGORIES = ['geopolitica', 'crypto', 'economia', 'esportes'];\n\n// Remove acentos para aceitar \"geopolítica\" e \"geopolitica\" igualmente\nfunction normalize(s) {\n  return (s || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nconst parts = text.split(/\\s+/);\nconst command = normalize(parts[0]);\nconst arg = normalize(parts[1] || '');\n\nfunction statusText() {\n  const f = staticData.userFilters;\n  return VALID_CATEGORIES.map(c => (f[c] !== false ? '✅' : '❌') + ' ' + c).join('\\n');\n}\n\nlet responseText = '';\n\nif (command === '/filtros' || command === '/categorias') {\n  responseText = '<b>Filtros de categoria ativos:</b>\\n\\n' + statusText() +\n    '\\n\\n<i>Use /ativar ou /desativar &lt;categoria&gt; para alterar.</i>';\n\n} else if (command === '/ativar') {\n  if (!arg || !VALID_CATEGORIES.includes(arg)) {\n    responseText = '❓ Categoria inválida.\\n\\nOpções: <code>' + VALID_CATEGORIES.join(', ') + '</code>';\n  } else {\n    staticData.userFilters[arg] = true;\n    responseText = '✅ Categoria <b>' + arg + '</b> ativada.\\n\\n' + statusText();\n  }\n\n} else if (command === '/desativar') {\n  if (!arg || !VALID_CATEGORIES.includes(arg)) {\n    responseText = '❓ Categoria inválida.\\n\\nOpções: <code>' + VALID_CATEGORIES.join(', ') + '</code>';\n  } else {\n    const activeCount = VALID_CATEGORIES.filter(c => staticData.userFilters[c] !== false).length;\n    if (activeCount <= 1 && staticData.userFilters[arg] !== false) {\n      responseText = '⚠️ Você precisa manter ao menos uma categoria ativa.';\n    } else {\n      staticData.userFilters[arg] = false;\n      responseText = '❌ Categoria <b>' + arg + '</b> desativada.\\n\\n' + statusText();\n    }\n  }\n\n} else if (command === '/help' || command === '/start') {\n  responseText = '<b>Comandos de configuração:</b>\\n\\n'\n    + '/filtros — ver categorias ativas\\n'\n    + '/ativar &lt;categoria&gt; — ativar categoria\\n'\n    + '/desativar &lt;categoria&gt; — desativar categoria\\n\\n'\n    + '<b>Categorias disponíveis:</b>\\n'\n    + '• <code>geopolitica</code> — guerras, eleições, diplomacia\\n'\n    + '• <code>crypto</code> — Bitcoin, Ethereum, DeFi\\n'\n    + '• <code>economia</code> — Fed, inflação, tarifas, PIB\\n'\n    + '• <code>esportes</code> — Copa do Mundo, NBA, NFL';\n\n} else {\n  // Comando não reconhecido — ignora silenciosamente\n  return [];\n}\n\nreturn [{ json: { chat_id: chatId, response_text: responseText } }];"
+      }
+    },
+    {
+      "id": "n28",
+      "name": "Responder Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        690,
+        620
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.response_text }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram Bot API"
+        }
+      }
     }
   ],
   "connections": {
@@ -773,6 +835,28 @@
         [
           {
             "node": "Gerar Sinal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Comando": {
+      "main": [
+        [
+          {
+            "node": "Processar Comando",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Comando": {
+      "main": [
+        [
+          {
+            "node": "Responder Telegram",
             "type": "main",
             "index": 0
           }
