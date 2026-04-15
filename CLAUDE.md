@@ -44,6 +44,8 @@ Schedule (30min) → Buscar Tweets (twitterapi.io) → Extrair Tweets
   → Extrair Validação → Preparar Sentimento IA → Agente Sentimento IA
   → Extrair Sentimento → Gerar Sinal → Verificar Oportunidade
   → Telegram Alert
+
+Telegram Comando (mensagem do usuário) → Processar Comando → Responder Telegram
 ```
 
 ---
@@ -77,6 +79,9 @@ Schedule (30min) → Buscar Tweets (twitterapi.io) → Extrair Tweets
 | n23 | Agente Sentimento IA | Basic LLM Chain — detecta se notícia é positiva ou negativa para o YES |
 | n24 | LLM Chat Model - Sentimento | Sub-nó do n23 via ai_languageModel |
 | n25 | Extrair Sentimento | Parseia POSITIVE/NEGATIVE; propaga NO_TRADE se skip_sentiment |
+| n26 | Telegram Comando | Telegram Trigger — recebe comandos de configuração do usuário |
+| n27 | Processar Comando | Parseia /filtros, /ativar, /desativar; atualiza userFilters no static data |
+| n28 | Responder Telegram | Envia resposta HTML ao usuário via Telegram |
 
 ---
 
@@ -147,10 +152,54 @@ O sinal `NO_TRADE` pode surgir em:
    - Notícia geopolítica (war, missile, military, election, etc.) + autor < 1.000 seguidores → `pre_no_trade: true`
    - YouTube + autor < 5.000 seguidores → `pre_no_trade: true`
    - Também computa `credibility_score` (0–70) baseado em seguidores + verificação (`isBlueVerified`/`isVerified`)
+   - Filtro de categoria: classifica o tweet em `geopolitica`, `crypto`, `economia` ou `esportes` por regex; retorna NO_TRADE se a categoria estiver desativada em `staticData.userFilters`
 3. **n14/n15** — LLM julga irrelevante → n17 descarta
 4. **n8** — nenhum mercado encontrado ou passou no filtro → n18/n21 propagam
 5. **n21** — LLM de validação rejeitou o mercado → n22 recebe e propaga via skip_sentiment
 6. **n9/n10** — qualquer NO_TRADE chega ao n9, que propaga; n10 descarta
+
+---
+
+## Filtros de categoria por usuário
+
+O usuário pode configurar via Telegram quais categorias de mercado deseja monitorar. O estado é persistido em `$getWorkflowStaticData('global').userFilters` entre execuções.
+
+### Categorias e keywords de detecção
+
+| Categoria | Keywords principais |
+|---|---|
+| `geopolitica` | war, missile, military, invasion, election, nato, ceasefire, coup, assassination |
+| `crypto` | bitcoin, ethereum, blockchain, defi, nft, binance, coinbase, solana, xrp |
+| `economia` | fed, rate cut/hike, inflation, gdp, tariff, trade deal, recession, nasdaq |
+| `esportes` | nba, nfl, world cup, olympics, superbowl, fifa, formula 1, ufc |
+
+Tweets que não casam com nenhuma categoria passam livremente (sem classificação = não filtrado).
+
+### Comandos Telegram
+
+| Comando | Exemplo | Efeito |
+|---|---|---|
+| `/filtros` | `/filtros` | Exibe status de cada categoria |
+| `/ativar <cat>` | `/ativar crypto` | Ativa a categoria |
+| `/desativar <cat>` | `/desativar esportes` | Desativa a categoria |
+| `/help` | `/help` | Lista todos os comandos |
+
+O argumento aceita acentos ou não (`geopolítica` = `geopolitica`). Não é possível desativar a última categoria ativa.
+
+### Static data
+
+```json
+{
+  "userFilters": {
+    "geopolitica": true,
+    "crypto": true,
+    "economia": true,
+    "esportes": true
+  }
+}
+```
+
+Default: todas ativas (comportamento idêntico ao estado anterior à feature).
 
 ---
 
