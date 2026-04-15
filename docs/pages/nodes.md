@@ -573,3 +573,49 @@ O argumento aceita tanto a forma acentuada (`geopolítica`) quanto sem acento (`
 | `parse_mode` | `HTML` |
 
 Envia a resposta do n27 de volta ao usuário via Telegram.
+
+---
+
+## n29 — Buscar Reddit
+
+| Propriedade | Valor |
+|---|---|
+| Tipo | `n8n-nodes-base.httpRequest` |
+| typeVersion | 4.2 |
+| Método | GET |
+| URL | `https://www.reddit.com/r/worldnews+Economics/new.json?limit=25&sort=new` |
+
+Busca os 25 posts mais recentes dos subreddits r/worldnews e r/Economics em uma única requisição. O operador `+` é suportado pela API pública do Reddit.
+
+**Header obrigatório:** `User-Agent: n8n:polymarket-alert-bot:1.0` — sem ele a API retorna 429.
+
+---
+
+## n30 — Extrair Posts Reddit
+
+| Propriedade | Valor |
+|---|---|
+| Tipo | `n8n-nodes-base.code` |
+| typeVersion | 2 |
+| Mode | `runOnceForAllItems` |
+
+Normaliza os posts do Reddit para o mesmo schema que o restante do pipeline consome (igual ao output do n3 para tweets).
+
+**Campos gerados:**
+- `id`: `"reddit_"` + post id (evita colisão com IDs de tweet na deduplicação)
+- `text`: título do post; se for self-post, adiciona até 200 chars do corpo
+- `author_followers`: `max(score * 100, 10000)` — proxy de credibilidade baseado em upvotes; piso de 10k para não ser barrado pelo filtro geopolítico de contas com < 1k seguidores
+- `source`: `"reddit"` — usado pelo n9 para ajustar o formato da mensagem Telegram
+- Posts com `stickied: true` são descartados
+
+---
+
+## n31 — Merge Fontes
+
+| Propriedade | Valor |
+|---|---|
+| Tipo | `n8n-nodes-base.merge` |
+| typeVersion | 3 |
+| Mode | `append` |
+
+Combina os itens vindos de n3 (tweets normalizados) e n30 (posts Reddit normalizados) em uma única lista antes do SplitInBatches. O modo `append` simplesmente concatena os arrays — sem deduplicação nesse ponto (a deduplicação ocorre por ID no n5).

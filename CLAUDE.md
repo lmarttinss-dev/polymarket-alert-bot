@@ -36,7 +36,9 @@ Para editar o workflow, edite este JSON diretamente. A estrutura é:
 ## Arquitetura do pipeline
 
 ```
-Schedule (30min) → Buscar Tweets (twitterapi.io) → Extrair Tweets
+Schedule (30min) → Buscar Tweets (twitterapi.io) → Extrair Tweets ──┐
+                → Buscar Reddit (worldnews+Economics) → Extrair Posts Reddit ─┘
+                                                        → Merge Fontes
   → SplitInBatches (1 por vez) → Analisar Noticia (filtro 35min)
   → É Recente? → Preparar Prompt IA → Agente de IA (Gemini)
   → Extrair Query IA → É Relevante? → Buscar Mercados (Polymarket)
@@ -79,6 +81,9 @@ Telegram Comando (mensagem do usuário) → Processar Comando → Responder Tele
 | n23 | Agente Sentimento IA | Basic LLM Chain — detecta se notícia é positiva ou negativa para o YES |
 | n24 | LLM Chat Model - Sentimento | Sub-nó do n23 via ai_languageModel |
 | n25 | Extrair Sentimento | Parseia POSITIVE/NEGATIVE; propaga NO_TRADE se skip_sentiment |
+| n29 | Buscar Reddit | GET reddit.com/r/worldnews+Economics/new.json — 25 posts mais recentes |
+| n30 | Extrair Posts Reddit | Normaliza posts do Reddit para o mesmo formato de tweet (id, text, author, createdAt, url, source) |
+| n31 | Merge Fontes | Combina tweets (n3) e posts Reddit (n30) em modo append antes do SplitInBatches |
 | n26 | Telegram Comando | Telegram Trigger — recebe comandos de configuração do usuário |
 | n27 | Processar Comando | Parseia /filtros, /ativar, /desativar; atualiza userFilters no static data |
 | n28 | Responder Telegram | Envia resposta HTML ao usuário via Telegram |
@@ -157,6 +162,42 @@ O sinal `NO_TRADE` pode surgir em:
 4. **n8** — nenhum mercado encontrado ou passou no filtro → n18/n21 propagam
 5. **n21** — LLM de validação rejeitou o mercado → n22 recebe e propaga via skip_sentiment
 6. **n9/n10** — qualquer NO_TRADE chega ao n9, que propaga; n10 descarta
+
+---
+
+## Reddit como fonte de notícias
+
+### API utilizada
+- **URL:** `GET https://www.reddit.com/r/worldnews+Economics/new.json?limit=25&sort=new`
+- **Auth:** nenhuma (API pública)
+- **Header obrigatório:** `User-Agent: n8n:polymarket-alert-bot:1.0`
+- O operador `+` na URL busca os dois subreddits em uma única chamada
+
+### Normalização (n30)
+Posts do Reddit são convertidos para o mesmo formato de tweet que o restante do pipeline espera:
+
+| Campo Reddit | Campo normalizado | Observação |
+|---|---|---|
+| `data.id` | `id` | Prefixado com `reddit_` para evitar colisão com IDs de tweet |
+| `data.title` + `data.selftext` | `text` | selftext limitado a 200 chars; ignorado se `[removed]` |
+| `data.author` | `author` | username do Reddit |
+| `max(score * 100, 10000)` | `author_followers` | Proxy: score alto → mais credibilidade; mínimo 10k para não ser barrado pelo filtro geopolítico |
+| `data.created_utc * 1000` | `createdAt` | Unix → ISO string |
+| `https://reddit.com` + `permalink` | `url` | Link direto ao post |
+| `"reddit"` | `source` | Distingue de tweets no n9 |
+| `data.stickied === true` | filtrado | Posts fixados são descartados |
+
+### Mensagem Telegram para posts Reddit
+Quando `source === "reddit"`, o n9 usa formato diferente:
+```
+📰 Reddit r/worldnews — u/autor:
+Título do post...
+```
+Em vez de:
+```
+🐦 Tweet de @autor:
+```
+O link de origem usa 📎 em vez de 🐦.
 
 ---
 

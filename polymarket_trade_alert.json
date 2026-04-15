@@ -99,7 +99,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const item = $input.first();\nconst tweet = item.json;\n\nif (tweet.signal === \"NO_TRADE\") { return [item]; }\n\n// ── Deduplicação: evitar reprocessar o mesmo tweet ───────────────────────\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.processedTweetIds) {\n  staticData.processedTweetIds = {};\n}\n\n// Limpar entradas com mais de 2 horas (TTL)\nconst TWO_HOURS = 2 * 60 * 60 * 1000;\nconst now = Date.now();\nfor (const id of Object.keys(staticData.processedTweetIds)) {\n  if (now - staticData.processedTweetIds[id] > TWO_HOURS) {\n    delete staticData.processedTweetIds[id];\n  }\n}\n\nconst tweetId = tweet.id || \"\";\nif (tweetId && staticData.processedTweetIds[tweetId]) {\n  return [{ json: { signal: \"NO_TRADE\", reason: \"Tweet já processado (deduplicação): \" + tweetId } }];\n}\n\n// Marcar como processado antes de continuar (otimistic)\nif (tweetId) {\n  staticData.processedTweetIds[tweetId] = now;\n}\n\n// ── Filtro de recência ────────────────────────────────────────────────────\nconst createdAt = tweet.createdAt || \"\";\nif (createdAt) {\n  const tweetDate = new Date(createdAt);\n  const minutesAgo = (now - tweetDate.getTime()) / 60000;\n  if (minutesAgo > 35) {\n    return [{ json: { signal: \"NO_TRADE\", reason: \"Tweet mais antigo que 35 minutos (\" + Math.round(minutesAgo) + \"min)\" } }];\n  }\n}\n\nreturn [{\n  json: {\n    news_text: tweet.text || \"\",\n    tweet_id: tweetId,\n    tweet_url: tweet.url || \"\",\n    author: tweet.author || \"\",\n    author_followers: tweet.author_followers || 0,\n    author_verified: tweet.author_verified || false,\n    timestamp: new Date().toISOString()\n  }\n}];"
+        "jsCode": "const item = $input.first();\nconst tweet = item.json;\n\nif (tweet.signal === \"NO_TRADE\") { return [item]; }\n\n// ── Deduplicação: evitar reprocessar o mesmo tweet ───────────────────────\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.processedTweetIds) {\n  staticData.processedTweetIds = {};\n}\n\n// Limpar entradas com mais de 2 horas (TTL)\nconst TWO_HOURS = 2 * 60 * 60 * 1000;\nconst now = Date.now();\nfor (const id of Object.keys(staticData.processedTweetIds)) {\n  if (now - staticData.processedTweetIds[id] > TWO_HOURS) {\n    delete staticData.processedTweetIds[id];\n  }\n}\n\nconst tweetId = tweet.id || \"\";\nif (tweetId && staticData.processedTweetIds[tweetId]) {\n  return [{ json: { signal: \"NO_TRADE\", reason: \"Tweet já processado (deduplicação): \" + tweetId } }];\n}\n\n// Marcar como processado antes de continuar (otimistic)\nif (tweetId) {\n  staticData.processedTweetIds[tweetId] = now;\n}\n\n// ── Filtro de recência ────────────────────────────────────────────────────\nconst createdAt = tweet.createdAt || \"\";\nif (createdAt) {\n  const tweetDate = new Date(createdAt);\n  const minutesAgo = (now - tweetDate.getTime()) / 60000;\n  if (minutesAgo > 35) {\n    return [{ json: { signal: \"NO_TRADE\", reason: \"Tweet mais antigo que 35 minutos (\" + Math.round(minutesAgo) + \"min)\" } }];\n  }\n}\n\nreturn [{\n  json: {\n    news_text: tweet.text || \"\",\n    tweet_id: tweetId,\n    tweet_url: tweet.url || \"\",\n    author: tweet.author || \"\",\n    author_followers: tweet.author_followers || 0,\n    author_verified: tweet.author_verified || false,\n    source: tweet.source || \"twitter\",\n    subreddit: tweet.subreddit || \"\",\n    timestamp: new Date().toISOString()\n  }\n}];"
       }
     },
     {
@@ -281,7 +281,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const item = $input.first();\nconst data = item.json;\n\nif (data.signal === \"NO_TRADE\") { return [item]; }\n\nconst markets = data.markets || [];\nif (markets.length === 0) {\n  return [{ json: { signal: \"NO_TRADE\", reason: \"Lista de mercados vazia\" } }];\n}\n\nconst top = markets[0];\nconst news = data.news_text || \"\";\n\nfunction esc(text) {\n  return (text || \"\").replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\");\n}\n\nlet yesPrice = 0.5;\ntry {\n  const prices = typeof top.outcomePrices === \"string\"\n    ? JSON.parse(top.outcomePrices)\n    : (top.outcomePrices || []);\n  yesPrice = parseFloat(prices[0] || 0.5);\n} catch(e) {}\n\nconst volume = parseFloat(top.volumeNum || top.volume || 0);\nconst yesPct = Math.round(yesPrice * 100);\n\nconst sentiment = data.sentiment || \"POSITIVE\";\nlet direction, expectedTo, confidence;\nif (sentiment === \"NEGATIVE\") {\n  direction = \"BUY_NO\";\n  expectedTo = Math.max(yesPct - (yesPrice >= 0.70 ? 20 : 12), 5);\n  confidence = yesPrice >= 0.70 ? 68 : 60;\n} else {\n  direction = \"BUY_YES\";\n  expectedTo = Math.min(yesPct + (yesPrice <= 0.30 ? 20 : 12), 95);\n  confidence = yesPrice <= 0.30 ? 70 : 60;\n}\n\nif (volume > 100000) confidence = Math.min(confidence + 8, 88);\nif (volume > 500000) confidence = Math.min(confidence + 5, 88);\n\nconst followers = data.author_followers || 0;\nif (followers > 100000) confidence = Math.min(confidence + 5, 88);\n\nconst eventSlug = top.eventSlug || (top.events && top.events[0] && top.events[0].slug) || \"\";\nconst marketSlug = top.slug || \"\";\nlet marketUrl;\nif (eventSlug && marketSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + eventSlug + \"/\" + marketSlug;\n} else if (eventSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + eventSlug;\n} else if (marketSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + marketSlug;\n} else if (top.id) {\n  marketUrl = \"https://polymarket.com/markets?id=\" + top.id;\n} else {\n  marketUrl = \"https://polymarket.com/markets?search=\" + encodeURIComponent(data.ai_query || \"\");\n}\nconst question = esc(top.question || top.title || \"N/A\");\nconst newsSummary = esc(news.length > 120 ? news.substring(0, 120) + \"...\" : news);\nconst authorInfo = data.author ? \"@\" + esc(data.author) : \"fonte desconhecida\";\nconst aiQueryInfo = data.ai_query ? \"\\n\\uD83E\\uDD16 <b>Query IA:</b> <code>\" + esc(data.ai_query) + \"</code>\" : \"\";\n\nconst msg = \"🚨 <b>ALERTA DE TRADE - POLYMARKET</b>\\n\\n\"\n  + \"🐦 <b>Tweet de \" + authorInfo + \":</b>\\n\" + newsSummary + \"\\n\\n\"\n  + \"📊 <b>Mercado:</b>\\n\" + question + \"\\n\\n\"\n  + \"🎯 <b>Direcao:</b> <code>\" + direction + \"</code>\\n\"\n  + \"💪 <b>Confianca:</b> \" + confidence + \"%\\n\"\n  + \"📈 <b>Movimento:</b> \" + yesPct + \"% \\u2192 \" + expectedTo + \"%\\n\"\n  + \"💰 <b>Volume:</b> $\" + Math.round(volume).toLocaleString(\"en-US\") + aiQueryInfo + \"\\n\\n\"\n  + \"🐦 \" + (data.tweet_url || \"\") + \"\\n\"\n  + \"🔗 \" + marketUrl;\n\nreturn [{ json: {\n  signal: \"TRADE\",\n  market_id: top.id || \"\",\n  market_question: question,\n  market_url: marketUrl,\n  direction: direction,\n  confidence: confidence,\n  expected_from: yesPct,\n  expected_to: expectedTo,\n  current_price_yes: yesPct,\n  volume: volume,\n  news_summary: newsSummary,\n  tweet_id: data.tweet_id || \"\",\n  tweet_url: data.tweet_url || \"\",\n  author: data.author || \"\",\n  author_followers: data.author_followers || 0,\n  ai_query: data.ai_query || \"\",\n  telegram_message: msg,\n  timestamp: new Date().toISOString()\n} }];"
+        "jsCode": "const item = $input.first();\nconst data = item.json;\n\nif (data.signal === \"NO_TRADE\") { return [item]; }\n\nconst markets = data.markets || [];\nif (markets.length === 0) {\n  return [{ json: { signal: \"NO_TRADE\", reason: \"Lista de mercados vazia\" } }];\n}\n\nconst top = markets[0];\nconst news = data.news_text || \"\";\nconst source = data.source || \"twitter\";\nconst subreddit = data.subreddit || \"\";\n\nfunction esc(text) {\n  return (text || \"\").replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\");\n}\n\nlet yesPrice = 0.5;\ntry {\n  const prices = typeof top.outcomePrices === \"string\"\n    ? JSON.parse(top.outcomePrices)\n    : (top.outcomePrices || []);\n  yesPrice = parseFloat(prices[0] || 0.5);\n} catch(e) {}\n\nconst volume = parseFloat(top.volumeNum || top.volume || 0);\nconst yesPct = Math.round(yesPrice * 100);\n\nconst sentiment = data.sentiment || \"POSITIVE\";\nlet direction, expectedTo, confidence;\nif (sentiment === \"NEGATIVE\") {\n  direction = \"BUY_NO\";\n  expectedTo = Math.max(yesPct - (yesPrice >= 0.70 ? 20 : 12), 5);\n  confidence = yesPrice >= 0.70 ? 68 : 60;\n} else {\n  direction = \"BUY_YES\";\n  expectedTo = Math.min(yesPct + (yesPrice <= 0.30 ? 20 : 12), 95);\n  confidence = yesPrice <= 0.30 ? 70 : 60;\n}\n\nif (volume > 100000) confidence = Math.min(confidence + 8, 88);\nif (volume > 500000) confidence = Math.min(confidence + 5, 88);\n\nconst followers = data.author_followers || 0;\nif (followers > 100000) confidence = Math.min(confidence + 5, 88);\n\nconst eventSlug = top.eventSlug || (top.events && top.events[0] && top.events[0].slug) || \"\";\nconst marketSlug = top.slug || \"\";\nlet marketUrl;\nif (eventSlug && marketSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + eventSlug + \"/\" + marketSlug;\n} else if (eventSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + eventSlug;\n} else if (marketSlug) {\n  marketUrl = \"https://polymarket.com/event/\" + marketSlug;\n} else if (top.id) {\n  marketUrl = \"https://polymarket.com/markets?id=\" + top.id;\n} else {\n  marketUrl = \"https://polymarket.com/markets?search=\" + encodeURIComponent(data.ai_query || \"\");\n}\nconst question = esc(top.question || top.title || \"N/A\");\nconst newsSummary = esc(news.length > 120 ? news.substring(0, 120) + \"...\" : news);\nconst authorInfo = data.author ? \"@\" + esc(data.author) : \"fonte desconhecida\";\nconst aiQueryInfo = data.ai_query ? \"\\n\\uD83E\\uDD16 <b>Query IA:</b> <code>\" + esc(data.ai_query) + \"</code>\" : \"\";\n\nconst msg = \"🚨 <b>ALERTA DE TRADE - POLYMARKET</b>\\n\\n\"\n  + (source === \"reddit\"\n  ? \"📰 <b>Reddit r/\" + esc(subreddit) + \" — u/\" + esc(data.author || \"\") + \":</b>\\n\" + newsSummary\n  : \"🐦 <b>Tweet de \" + authorInfo + \":</b>\\n\" + newsSummary) + \"\\n\\n\"\n  + \"📊 <b>Mercado:</b>\\n\" + question + \"\\n\\n\"\n  + \"🎯 <b>Direcao:</b> <code>\" + direction + \"</code>\\n\"\n  + \"💪 <b>Confianca:</b> \" + confidence + \"%\\n\"\n  + \"📈 <b>Movimento:</b> \" + yesPct + \"% \\u2192 \" + expectedTo + \"%\\n\"\n  + \"💰 <b>Volume:</b> $\" + Math.round(volume).toLocaleString(\"en-US\") + aiQueryInfo + \"\\n\\n\"\n  + (source === \"reddit\"\n  ? \"📎 \" + (data.tweet_url || \"\") + \"\\n\"\n  : \"🐦 \" + (data.tweet_url || \"\") + \"\\n\")\n  + \"🔗 \" + marketUrl;\n\nreturn [{ json: {\n  signal: \"TRADE\",\n  market_id: top.id || \"\",\n  market_question: question,\n  market_url: marketUrl,\n  direction: direction,\n  confidence: confidence,\n  expected_from: yesPct,\n  expected_to: expectedTo,\n  current_price_yes: yesPct,\n  volume: volume,\n  news_summary: newsSummary,\n  tweet_id: data.tweet_id || \"\",\n  tweet_url: data.tweet_url || \"\",\n  author: data.author || \"\",\n  author_followers: data.author_followers || 0,\n  ai_query: data.ai_query || \"\",\n  telegram_message: msg,\n  timestamp: new Date().toISOString()\n} }];"
       }
     },
     {
@@ -541,6 +541,60 @@
           "name": "Telegram Bot API"
         }
       }
+    },
+    {
+      "id": "n29",
+      "name": "Buscar Reddit",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        470,
+        520
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.reddit.com/r/worldnews+Economics/new.json?limit=25&sort=new",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "n8n:polymarket-alert-bot:1.0"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "n30",
+      "name": "Extrair Posts Reddit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        690,
+        520
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const item = $input.first();\nconst data = item.json;\n\nconst children = (data.data && data.data.children) || [];\n\nif (children.length === 0) {\n  return [{ json: { signal: \"NO_TRADE\", reason: \"Nenhum post retornado pelo Reddit\" } }];\n}\n\nreturn children\n  .filter(function(child) {\n    const p = child.data || {};\n    // Ignorar posts fixados (stickied) e posts sem título\n    return !p.stickied && p.title;\n  })\n  .map(function(child) {\n    const p = child.data || {};\n\n    // Texto: título + corpo resumido se for self-post\n    let text = p.title || \"\";\n    if (p.is_self && p.selftext && p.selftext.length > 0 && p.selftext !== \"[removed]\") {\n      const excerpt = p.selftext.substring(0, 200).replace(/\\n+/g, \" \").trim();\n      text = text + \" — \" + excerpt;\n    }\n\n    // Converte Unix timestamp para ISO string\n    const createdAt = p.created_utc\n      ? new Date(p.created_utc * 1000).toISOString()\n      : new Date().toISOString();\n\n    const permalink = p.permalink || \"\";\n    const url = permalink ? \"https://reddit.com\" + permalink : \"\";\n\n    return {\n      json: {\n        id: \"reddit_\" + (p.id || \"\"),\n        text: text,\n        author: p.author || \"\",\n        // Reddit não expõe seguidores por post; usa score como proxy\n        // mínimo de 10000 para não ser barrado pelo filtro de credibilidade\n        author_followers: Math.max((p.score || 0) * 100, 10000),\n        author_verified: false,\n        createdAt: createdAt,\n        retweetCount: 0,\n        likeCount: p.score || 0,\n        viewCount: 0,\n        url: url,\n        isReply: false,\n        source: \"reddit\",\n        subreddit: p.subreddit || \"\"\n      }\n    };\n  });"
+      }
+    },
+    {
+      "id": "n31",
+      "name": "Merge Fontes",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        870,
+        390
+      ],
+      "parameters": {
+        "mode": "append"
+      }
     }
   ],
   "connections": {
@@ -549,6 +603,11 @@
         [
           {
             "node": "Buscar Tweets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Buscar Reddit",
             "type": "main",
             "index": 0
           }
@@ -570,7 +629,7 @@
       "main": [
         [
           {
-            "node": "Processar um por um",
+            "node": "Merge Fontes",
             "type": "main",
             "index": 0
           }
@@ -857,6 +916,39 @@
         [
           {
             "node": "Responder Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Reddit": {
+      "main": [
+        [
+          {
+            "node": "Extrair Posts Reddit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair Posts Reddit": {
+      "main": [
+        [
+          {
+            "node": "Merge Fontes",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Fontes": {
+      "main": [
+        [
+          {
+            "node": "Processar um por um",
             "type": "main",
             "index": 0
           }
