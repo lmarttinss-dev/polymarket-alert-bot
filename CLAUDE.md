@@ -54,7 +54,7 @@ Schedule (30min) → Buscar Tweets (twitterapi.io) → Extrair Tweets
 |---|---|---|
 | n1 | Schedule Trigger | Dispara a cada 30 minutos |
 | n2 | Buscar Tweets | twitterapi.io advanced search |
-| n3 | Extrair Tweets | Normaliza array de tweets |
+| n3 | Extrair Tweets | Normaliza array de tweets (inclui `author_verified` via `isBlueVerified`/`isVerified`) |
 | n4 | Processar um por um | SplitInBatches(1) — loop por tweet |
 | n5 | Analisar Noticia | Descarta tweets > 35 min |
 | n6 | É Recente? | IF signal ≠ NO_TRADE |
@@ -64,7 +64,7 @@ Schedule (30min) → Buscar Tweets (twitterapi.io) → Extrair Tweets
 | n10 | Verificar Oportunidade | IF signal === TRADE |
 | n11 | Telegram Alert | Envia alerta com parse_mode HTML |
 | n12 | Sem Oportunidade | noOp — encerra branch |
-| n13 | Preparar Prompt IA | Sanitiza tweet e monta prompt |
+| n13 | Preparar Prompt IA | Sanitiza tweet, computa credibility_score, aplica pré-filtros geopolítico (< 1k seguidores) e YouTube (< 5k), monta prompt |
 | n14 | Agente de IA | Basic LLM Chain (chainLlm) |
 | n15 | Extrair Query IA | Parseia resposta do LLM |
 | n16 | LLM Chat Model | Sub-nó do n14 via ai_languageModel |
@@ -143,7 +143,10 @@ O n8 recebe dados do n7 (Buscar Mercados), mas precisa dos dados do tweet (autho
 
 O sinal `NO_TRADE` pode surgir em:
 1. **n5** — tweet já processado (deduplicação via static data, TTL 2h) ou com mais de 35 minutos → n6 descarta
-2. **n13** — pré-filtro hard-coded: YouTube + autor < 5.000 seguidores → seta `pre_no_trade: true`, n15 descarta sem consumir LLM
+2. **n13** — dois pré-filtros hard-coded sem custo de LLM:
+   - Notícia geopolítica (war, missile, military, election, etc.) + autor < 1.000 seguidores → `pre_no_trade: true`
+   - YouTube + autor < 5.000 seguidores → `pre_no_trade: true`
+   - Também computa `credibility_score` (0–70) baseado em seguidores + verificação (`isBlueVerified`/`isVerified`)
 3. **n14/n15** — LLM julga irrelevante → n17 descarta
 4. **n8** — nenhum mercado encontrado ou passou no filtro → n18/n21 propagam
 5. **n21** — LLM de validação rejeitou o mercado → n22 recebe e propaga via skip_sentiment

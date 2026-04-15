@@ -64,7 +64,8 @@ Normaliza a resposta da twitterapi.io. Extrai o array `tweets` e transforma cada
   "likeCount": 234,
   "viewCount": 5000,
   "url": "https://x.com/Reuters/status/1234567890",
-  "isReply": false
+  "isReply": false,
+  "author_verified": true
 }
 ```
 
@@ -114,6 +115,7 @@ Recebe de volta (`Telegram Alert` e `Sem Oportunidade`) para avançar ao próxim
   "tweet_url": "https://x.com/Reuters/status/1234567890",
   "author": "Reuters",
   "author_followers": 24000000,
+  "author_verified": true,
   "timestamp": "2026-04-04T12:01:00.000Z"
 }
 ```
@@ -141,11 +143,35 @@ Recebe de volta (`Telegram Alert` e `Sem Oportunidade`) para avançar ao próxim
 | typeVersion | 2 |
 | Mode | `runOnceForAllItems` |
 
-Sanitiza o texto do tweet e monta o prompt para o LLM. Também aplica um **pré-filtro hard-coded** que descarta fontes de baixa credibilidade antes de chamar o Gemini.
+Sanitiza o texto do tweet, computa um **score de credibilidade do autor** e monta o prompt para o LLM. Aplica dois **pré-filtros hard-coded** que descartam fontes de baixa credibilidade antes de chamar o Gemini.
 
-**Pré-filtro (sem custo de LLM):**
+**Score de credibilidade (0–70):**
 
-Se o tweet contém uma referência ao YouTube (`via @YouTube`, `youtube.com` ou `youtu.be`) **E** o autor tem menos de 5.000 seguidores, o node retorna imediatamente com `pre_no_trade: true`, sem montar prompt nem consumir tokens.
+| Critério | Pontos |
+|---|---|
+| ≥ 1.000.000 seguidores | +50 |
+| ≥ 100.000 seguidores | +30 |
+| ≥ 10.000 seguidores | +15 |
+| ≥ 1.000 seguidores | +5 |
+| Conta verificada (`isBlueVerified` ou `isVerified`) | +20 |
+
+O `credibility_score` é propagado como campo no JSON para uso em etapas seguintes.
+
+**Pré-filtro 1 — Notícia geopolítica de conta < 1k seguidores:**
+
+Detecta palavras-chave geopolíticas no tweet (war, missile, military, election, ceasefire, coup, etc.). Se a conta tem menos de 1.000 seguidores, descarta imediatamente com `pre_no_trade: true`.
+
+```js
+const GEOPOLITICAL_PATTERN = /\b(war|missile|military|troops|ceasefire|coup|conflict|...)\b/i;
+if (isGeopolitical && followers < 1000) {
+  return [{ json: { ...data, ai_prompt: "NO_TRADE", pre_no_trade: true,
+    pre_no_trade_reason: `Geopolitical news from low-credibility account (${followers} followers, verified: ${isVerified})` } }];
+}
+```
+
+**Pré-filtro 2 — Link do YouTube de conta < 5k seguidores:**
+
+Se o tweet contém referência ao YouTube (`via @YouTube`, `youtube.com` ou `youtu.be`) **E** o autor tem menos de 5.000 seguidores, descarta imediatamente.
 
 ```js
 const hasYouTubeRef = /via @YouTube|youtube\.com|youtu\.be/i.test(originalText);
@@ -180,9 +206,9 @@ DISQUALIFY with NO_TRADE if ANY of the following apply:
 - Reply, personal opinion, joke, insult, or spam
 ```
 
-**Saída (pré-filtro ativado):** `{ ...dados_do_tweet, ai_prompt: "NO_TRADE", pre_no_trade: true, pre_no_trade_reason: "..." }`
+**Saída (pré-filtro ativado):** `{ ...dados_do_tweet, ai_prompt: "NO_TRADE", pre_no_trade: true, pre_no_trade_reason: "...", credibility_score: N }`
 
-**Saída (fluxo normal):** `{ ...dados_do_tweet, ai_prompt: "..." }`
+**Saída (fluxo normal):** `{ ...dados_do_tweet, ai_prompt: "...", credibility_score: N, author_verified: bool }`
 
 ---
 
